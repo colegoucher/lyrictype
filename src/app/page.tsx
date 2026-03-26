@@ -38,6 +38,49 @@ function bigArtwork(url: string) {
   return url.replace("100x100", "400x400");
 }
 
+function extractAccentColor(imageUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 60;
+        canvas.height = 60;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve("#22d3ee"); return; }
+        ctx.drawImage(img, 0, 0, 60, 60);
+        const { data } = ctx.getImageData(0, 0, 60, 60);
+
+        // Bucket pixels by hue, skipping near-grey / near-black / near-white
+        const buckets = new Array(36).fill(0);
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255;
+          const max = Math.max(r, g, b), min = Math.min(r, g, b);
+          const l = (max + min) / 2;
+          const s = max === min ? 0 : l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+          if (s < 0.3 || l < 0.15 || l > 0.85) continue;
+          let h = 0;
+          if (max === r)      h = ((g - b) / (max - min)) % 6;
+          else if (max === g) h = (b - r) / (max - min) + 2;
+          else                h = (r - g) / (max - min) + 4;
+          h = Math.round(h * 60);
+          if (h < 0) h += 360;
+          buckets[Math.floor(h / 10)]++;
+        }
+
+        const best = buckets.indexOf(Math.max(...buckets));
+        if (buckets[best] < 8) { resolve("#22d3ee"); return; } // image too grey — fall back
+        resolve(`hsl(${best * 10 + 5}, 75%, 62%)`);
+      } catch {
+        resolve("#22d3ee");
+      }
+    };
+    img.onerror = () => resolve("#22d3ee");
+    img.src = imageUrl;
+  });
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 export default function Home() {
   const [step, setStep]             = useState<Step>("search");
@@ -48,6 +91,7 @@ export default function Home() {
   const [selectedAlbum, setSelectedAlbum]   = useState<Album | null>(null);
   const [tracks, setTracks]         = useState<Track[]>([]);
   const [songData, setSongData]     = useState<SongData | null>(null);
+  const [accentColor, setAccentColor] = useState("#22d3ee");
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const debounceRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,7 +181,9 @@ export default function Home() {
       if (!res.ok) { setError("Lyrics not found for this song."); return; }
       const data = await res.json();
       if (!data.lyrics) { setError("Lyrics not found for this song."); return; }
-      setSongData({ lyrics: data.lyrics, songTitle: track.trackName, artist: selectedArtist.artistName, artworkUrl: selectedAlbum ? bigArtwork(selectedAlbum.artworkUrl100) : undefined });
+      const artUrl = selectedAlbum ? bigArtwork(selectedAlbum.artworkUrl100) : undefined;
+      setSongData({ lyrics: data.lyrics, songTitle: track.trackName, artist: selectedArtist.artistName, artworkUrl: artUrl });
+      if (artUrl) extractAccentColor(artUrl).then(setAccentColor);
       setStep("typing");
     } catch {
       setError("Something went wrong fetching lyrics.");
@@ -282,7 +328,7 @@ export default function Home() {
         <div key="typing" className="step-enter flex w-full h-full">
 
           {/* Left: album art fills full height */}
-          <div className="relative w-[42%] shrink-0 h-full">
+          <div className="relative w-[42%] shrink-0 h-full bg-black">
             {songData.artworkUrl ? (
               <img
                 src={songData.artworkUrl}
@@ -293,7 +339,7 @@ export default function Home() {
               <div className="w-full h-full bg-zinc-900" />
             )}
             {/* Fade into right panel */}
-            <div className="absolute inset-y-0 right-0 w-40 bg-gradient-to-r from-transparent to-black pointer-events-none" />
+            <div className="absolute inset-y-0 right-0 w-10 bg-gradient-to-r from-transparent to-black pointer-events-none" />
             {/* Logo watermark */}
             <div className="absolute bottom-6 left-6">
               <span className="text-sm font-black tracking-tight text-white/40">
@@ -323,6 +369,7 @@ export default function Home() {
               lyrics={songData.lyrics}
               songTitle={songData.songTitle}
               artist={songData.artist}
+              accentColor={accentColor}
             />
           </div>
 
