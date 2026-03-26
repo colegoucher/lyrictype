@@ -60,7 +60,16 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
   }, []);
 
   const cleanLyrics = useCallback((raw: string) => {
-    return raw.replace(/\[.*?\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+    return raw
+      .replace(/\r/g, "")                                          // strip \r from Windows line endings
+      .replace(/[\u00AD\u200B\u200C\u200D\uFEFF\u2060]/g, "")     // strip invisible/zero-width chars (soft hyphen, ZWS, BOM, etc.)
+      .replace(/\u00A0/g, " ")                                     // non-breaking space → regular space
+      .replace(/[\u2018\u2019]/g, "'")                             // curly apostrophes → straight
+      .replace(/[\u201C\u201D]/g, '"')                             // curly quotes → straight
+      .replace(/[\u2013\u2014\u2015\u2010\u2011]/g, "-")          // all dash variants → hyphen-minus
+      .replace(/\[.*?\]/g, "")                                     // remove [Verse], [Chorus] etc.
+      .replace(/\n{3,}/g, "\n\n")                                  // collapse 3+ blank lines
+      .trim();
   }, []);
 
   const text = cleanLyrics(lyrics);

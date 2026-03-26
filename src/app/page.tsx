@@ -170,7 +170,7 @@ export default function Home() {
         {step !== "search" && (
           <button
             onClick={goBack}
-            className="rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
+            className="step-enter rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
           >
             ← Back
           </button>
@@ -179,7 +179,7 @@ export default function Home() {
 
       {/* ── Search ── */}
       {step === "search" && (
-        <div className="flex flex-1 flex-col items-center px-4 pt-12 gap-6">
+        <div key="search" className="step-enter flex flex-1 flex-col items-center px-4 pt-12 gap-6">
           <p className="text-zinc-400">Search for an artist to get started</p>
           <div className="relative w-full max-w-sm">
             <input
@@ -214,7 +214,7 @@ export default function Home() {
 
       {/* ── Albums ── */}
       {step === "albums" && (
-        <div className="flex flex-1 flex-col items-center px-6 pt-6 gap-6 overflow-y-auto">
+        <div key="albums" className="step-enter flex flex-1 flex-col items-center px-6 pt-6 gap-6 overflow-y-auto">
           <h2 className="text-2xl font-bold text-white">{selectedArtist?.artistName}</h2>
           {loading && <p className="text-zinc-500 text-sm">Loading albums...</p>}
           {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -244,7 +244,7 @@ export default function Home() {
 
       {/* ── Tracks ── */}
       {step === "tracks" && (
-        <div className="flex flex-1 flex-col items-center px-6 pt-6 gap-6 overflow-y-auto">
+        <div key="tracks" className="step-enter flex flex-1 flex-col items-center px-6 pt-6 gap-6 overflow-y-auto">
           <div className="flex items-center gap-6 w-full max-w-lg">
             {selectedAlbum && (
               <img
@@ -277,7 +277,7 @@ export default function Home() {
 
       {/* ── Typing ── */}
       {step === "typing" && songData && (
-        <div className="flex flex-1 flex-col items-center px-4 pt-6 gap-6">
+        <div key="typing" className="step-enter flex flex-1 flex-col items-center px-4 pt-6 gap-6">
           <div className="flex items-center gap-5">
             {songData.artworkUrl && (
               <img
