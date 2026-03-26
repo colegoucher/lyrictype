@@ -1,116 +1,295 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import TypingTest from "@/components/TypingTest";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+interface Artist {
+  artistId: number;
+  artistName: string;
+  primaryGenreName?: string;
+}
+
+interface Album {
+  collectionId: number;
+  collectionName: string;
+  artworkUrl100: string;
+  releaseDate: string;
+  trackCount: number;
+}
+
+interface Track {
+  trackId: number;
+  trackName: string;
+  trackNumber: number;
+}
 
 interface SongData {
   lyrics: string;
   songTitle: string;
   artist: string;
+  artworkUrl?: string;
 }
 
+type Step = "search" | "albums" | "tracks" | "typing";
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function bigArtwork(url: string) {
+  return url.replace("100x100", "400x400");
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
 export default function Home() {
-  const [artist, setArtist] = useState("");
-  const [song, setSong] = useState("");
-  const [songData, setSongData] = useState<SongData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [step, setStep]             = useState<Step>("search");
+  const [query, setQuery]           = useState("");
+  const [artists, setArtists]       = useState<Artist[]>([]);
+  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
+  const [albums, setAlbums]         = useState<Album[]>([]);
+  const [selectedAlbum, setSelectedAlbum]   = useState<Album | null>(null);
+  const [tracks, setTracks]         = useState<Track[]>([]);
+  const [songData, setSongData]     = useState<SongData | null>(null);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const debounceRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!artist.trim() || !song.trim()) return;
+  // Debounced artist search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) { setArtists([]); return; }
 
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res  = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=musicArtist&limit=6`
+        );
+        const data = await res.json();
+        setArtists(data.results ?? []);
+      } catch {
+        // silently ignore search errors
+      }
+    }, 300);
+  }, [query]);
+
+  // Fetch albums for an artist
+  async function selectArtist(artist: Artist) {
+    setSelectedArtist(artist);
     setLoading(true);
     setError(null);
-    setSongData(null);
-
     try {
-      const res = await fetch(
-        `https://api.lyrics.ovh/v1/${encodeURIComponent(artist.trim())}/${encodeURIComponent(song.trim())}`
+      const res  = await fetch(
+        `https://itunes.apple.com/lookup?id=${artist.artistId}&entity=album&limit=200&sort=recent`
       );
-      if (!res.ok) {
-        setError("Song not found. Try a different artist or title.");
-        return;
-      }
       const data = await res.json();
-      if (!data.lyrics) {
-        setError("No lyrics found for that song.");
-        return;
-      }
-      setSongData({ lyrics: data.lyrics, songTitle: song.trim(), artist: artist.trim() });
+      const albumResults: Album[] = data.results
+        .filter((r: { wrapperType: string }) => r.wrapperType === "collection")
+        .map((r: Album) => ({
+          collectionId:   r.collectionId,
+          collectionName: r.collectionName,
+          artworkUrl100:  r.artworkUrl100,
+          releaseDate:    r.releaseDate,
+          trackCount:     r.trackCount,
+        }));
+      setAlbums(albumResults);
+      setStep("albums");
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("Failed to load albums.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleBack = () => {
-    setSongData(null);
+  // Fetch tracks for an album
+  async function selectAlbum(album: Album) {
+    setSelectedAlbum(album);
+    setLoading(true);
     setError(null);
-  };
+    try {
+      const res  = await fetch(
+        `https://itunes.apple.com/lookup?id=${album.collectionId}&entity=song`
+      );
+      const data = await res.json();
+      const trackResults: Track[] = data.results
+        .filter((r: { wrapperType: string }) => r.wrapperType === "track")
+        .map((r: Track & { trackNumber: number; trackName: string }) => ({
+          trackId:     r.trackId,
+          trackName:   r.trackName,
+          trackNumber: r.trackNumber,
+        }))
+        .sort((a: Track, b: Track) => a.trackNumber - b.trackNumber);
+      setTracks(trackResults);
+      setStep("tracks");
+    } catch {
+      setError("Failed to load tracks.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
+  // Fetch lyrics for a track
+  async function selectTrack(track: Track) {
+    if (!selectedArtist) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `https://api.lyrics.ovh/v1/${encodeURIComponent(selectedArtist.artistName)}/${encodeURIComponent(track.trackName)}`
+      );
+      if (!res.ok) { setError("Lyrics not found for this song."); return; }
+      const data = await res.json();
+      if (!data.lyrics) { setError("Lyrics not found for this song."); return; }
+      setSongData({ lyrics: data.lyrics, songTitle: track.trackName, artist: selectedArtist.artistName, artworkUrl: selectedAlbum ? bigArtwork(selectedAlbum.artworkUrl100) : undefined });
+      setStep("typing");
+    } catch {
+      setError("Something went wrong fetching lyrics.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function goBack() {
+    setError(null);
+    if (step === "albums")  { setStep("search"); setAlbums([]); setSelectedArtist(null); }
+    if (step === "tracks")  { setStep("albums"); setTracks([]); setSelectedAlbum(null); }
+    if (step === "typing")  { setStep("tracks"); setSongData(null); }
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <main
       className="min-h-screen flex flex-col overflow-hidden"
       style={{ background: "radial-gradient(ellipse at 50% 0%, #1e1533 0%, #0a0a0f 60%)" }}
     >
-      {/* Top bar — always visible */}
-      <header className="flex items-center justify-between px-8 py-5">
+      {/* Header */}
+      <header className="flex items-center justify-between px-8 py-5 shrink-0">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-white">
             Lyric<span className="text-violet-400">Type</span>
           </h1>
           <p className="text-xs text-zinc-500 tracking-widest uppercase">Type the lyrics. Feel the music.</p>
         </div>
-        {songData && (
+        {step !== "search" && (
           <button
-            onClick={handleBack}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            onClick={goBack}
+            className="rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
           >
-            ← Search another song
+            ← Back
           </button>
         )}
       </header>
 
-      {/* Main content */}
-      {!songData ? (
-        // Search screen — centered
-        <div className="flex flex-1 flex-col items-center justify-center gap-8 px-4">
-          <div className="text-center">
-            <p className="text-zinc-400 text-lg">Search for a song to start typing</p>
+      {/* ── Search ── */}
+      {step === "search" && (
+        <div className="flex flex-1 flex-col items-center px-4 pt-12 gap-6">
+          <p className="text-zinc-400">Search for an artist to get started</p>
+          <div className="relative w-full max-w-sm">
+            <input
+              type="text"
+              placeholder="Artist name..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+              className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-3 text-zinc-100 placeholder-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
+            />
           </div>
-          <form onSubmit={handleSearch} className="flex flex-col gap-3 w-full max-w-sm">
-            <input
-              type="text"
-              placeholder="Artist"
-              value={artist}
-              onChange={(e) => setArtist(e.target.value)}
-              className="rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-3 text-zinc-100 placeholder-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
-            />
-            <input
-              type="text"
-              placeholder="Song title"
-              value={song}
-              onChange={(e) => setSong(e.target.value)}
-              className="rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-3 text-zinc-100 placeholder-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-lg bg-violet-600 px-6 py-3 font-semibold text-white hover:bg-violet-500 transition-colors disabled:opacity-50"
-            >
-              {loading ? "Loading..." : "Find Song"}
-            </button>
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-          </form>
+          {artists.length > 0 && (
+            <div className="w-full max-w-sm flex flex-col gap-2">
+              {artists.map((a) => (
+                <button
+                  key={a.artistId}
+                  onClick={() => selectArtist(a)}
+                  className="text-left rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-3 hover:border-violet-500 hover:bg-zinc-750 transition-colors"
+                >
+                  <p className="text-zinc-100 font-medium">{a.artistName}</p>
+                  {a.primaryGenreName && (
+                    <p className="text-zinc-500 text-xs mt-0.5">{a.primaryGenreName}</p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          {loading && <p className="text-zinc-500 text-sm">Loading...</p>}
+          {error && <p className="text-red-400 text-sm">{error}</p>}
         </div>
-      ) : (
-        // Typing screen — song title at top, box front and center
+      )}
+
+      {/* ── Albums ── */}
+      {step === "albums" && (
+        <div className="flex flex-1 flex-col items-center px-6 pt-6 gap-6 overflow-y-auto">
+          <h2 className="text-2xl font-bold text-white">{selectedArtist?.artistName}</h2>
+          {loading && <p className="text-zinc-500 text-sm">Loading albums...</p>}
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 w-full max-w-3xl pb-12">
+            {albums.map((album) => (
+              <button
+                key={album.collectionId}
+                onClick={() => selectAlbum(album)}
+                className="flex flex-col gap-2 text-left group"
+              >
+                <div className="aspect-square w-full overflow-hidden rounded-lg">
+                  <img
+                    src={bigArtwork(album.artworkUrl100)}
+                    alt={album.collectionName}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  />
+                </div>
+                <div>
+                  <p className="text-zinc-100 text-sm font-medium leading-tight line-clamp-2">{album.collectionName}</p>
+                  <p className="text-zinc-500 text-xs mt-0.5">{new Date(album.releaseDate).getFullYear()}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tracks ── */}
+      {step === "tracks" && (
+        <div className="flex flex-1 flex-col items-center px-6 pt-6 gap-6 overflow-y-auto">
+          <div className="flex items-center gap-6 w-full max-w-lg">
+            {selectedAlbum && (
+              <img
+                src={bigArtwork(selectedAlbum.artworkUrl100)}
+                alt={selectedAlbum.collectionName}
+                className="w-24 h-24 rounded-lg object-cover shrink-0"
+              />
+            )}
+            <div>
+              <h2 className="text-xl font-bold text-white">{selectedAlbum?.collectionName}</h2>
+              <p className="text-zinc-400 text-sm">{selectedArtist?.artistName}</p>
+            </div>
+          </div>
+          {loading && <p className="text-zinc-500 text-sm">Loading tracks...</p>}
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+          <div className="flex flex-col w-full max-w-lg pb-12">
+            {tracks.map((track) => (
+              <button
+                key={track.trackId}
+                onClick={() => selectTrack(track)}
+                className="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-white/5 transition-colors text-left group"
+              >
+                <span className="text-zinc-600 text-sm w-5 text-right shrink-0">{track.trackNumber}</span>
+                <span className="text-zinc-200 group-hover:text-white transition-colors">{track.trackName}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Typing ── */}
+      {step === "typing" && songData && (
         <div className="flex flex-1 flex-col items-center px-4 pt-6 gap-6">
-          <div className="text-center">
-            <h2 className="text-4xl font-bold text-white tracking-tight">{songData.songTitle}</h2>
-            <p className="text-zinc-400 mt-1">{songData.artist}</p>
+          <div className="flex items-center gap-5">
+            {songData.artworkUrl && (
+              <img
+                src={songData.artworkUrl}
+                alt={songData.songTitle}
+                className="w-20 h-20 rounded-lg object-cover shadow-lg shadow-black/40 shrink-0"
+              />
+            )}
+            <div>
+              <h2 className="text-4xl font-bold text-white tracking-tight">{songData.songTitle}</h2>
+              <p className="text-zinc-400 mt-1">{songData.artist}</p>
+            </div>
           </div>
           <TypingTest
             lyrics={songData.lyrics}
