@@ -19,7 +19,7 @@ const CLASS: Record<CharState, string> = {
   pending:   "relative text-zinc-600",
   correct:   "relative text-zinc-300",
   incorrect: "relative text-red-400 bg-red-900/20",
-  active:    "relative text-zinc-600 before:absolute before:-left-px before:top-0 before:h-full before:w-0.5 before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]",
+  active:    "relative text-zinc-600 before:absolute before:-left-px before:top-0 before:h-full before:w-px before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]",
 };
 
 export default function TypingTest({
@@ -118,7 +118,7 @@ export default function TypingTest({
     if (!el) return;
     if (charDomRefs.current[index]?.dataset.newline) {
       el.className = state === "active"
-        ? "relative text-zinc-500 before:absolute before:-left-px before:top-0 before:h-full before:w-0.5 before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]"
+        ? "relative text-zinc-500 before:absolute before:-left-px before:top-0 before:h-full before:w-px before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]"
         : "relative opacity-0 select-none";
     } else {
       el.className = CLASS[state];
