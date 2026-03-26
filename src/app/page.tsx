@@ -44,6 +44,8 @@ interface TopAlbum {
   name: string;
   artist: string;
   artworkUrl: string;
+  trackName: string;
+  collectionId: number;
 }
 
 type Step = "search" | "albums" | "tracks" | "typing";
@@ -142,8 +144,10 @@ export default function Home() {
   const previewHideRef                = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cycling
-  const [topAlbums, setTopAlbums] = useState<TopAlbum[]>([]);
-  const cycleIndexRef             = useRef(0);
+  const [topAlbums, setTopAlbums]       = useState<TopAlbum[]>([]);
+  const [featuredAlbum, setFeaturedAlbum] = useState<TopAlbum | null>(null);
+  const [featuredVisible, setFeaturedVisible] = useState(false);
+  const cycleIndexRef                   = useRef(0);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -167,56 +171,61 @@ export default function Home() {
       "The Dark Side of the Moon Pink Floyd",
       "Thriller Michael Jackson",
       "Abbey Road Beatles",
+      "Aladdin Sane David Bowie",
+      "Sgt Peppers Lonely Hearts Club Band Beatles",
+      "My Beautiful Dark Twisted Fantasy Kanye West",
+      "Astroworld Travis Scott",
+      "London Calling The Clash",
+      "Sticky Fingers Rolling Stones",
       "Rumours Fleetwood Mac",
       "Nevermind Nirvana",
       "Random Access Memories Daft Punk",
       "To Pimp a Butterfly Kendrick Lamar",
+      "DAMN Kendrick Lamar",
       "good kid maad city Kendrick Lamar",
-      "folklore Taylor Swift",
-      "21 Adele",
+      "Mr Morale and the Big Steppers Kendrick Lamar",
       "The College Dropout Kanye West",
-      "Kind of Blue Miles Davis",
+      "Kid A Radiohead",
+      "OK Computer Radiohead",
       "channel ORANGE Frank Ocean",
+      "Blonde Frank Ocean",
       "IGOR Tyler the Creator",
+      "Flower Boy Tyler the Creator",
       "Currents Tame Impala",
       "Purple Rain Prince",
       "Led Zeppelin IV",
-      "Whats Going On Marvin Gaye",
+      "Wish You Were Here Pink Floyd",
+      "Houses of the Holy Led Zeppelin",
       "Appetite for Destruction Guns N Roses",
-      "The Blueprint Jay-Z",
-      "Born to Run Bruce Springsteen",
       "Illmatic Nas",
-      "OK Computer Radiohead",
-      "Pet Sounds Beach Boys",
-      "Blonde on Blonde Bob Dylan",
-      "Midnights Taylor Swift",
-      "After Hours The Weeknd",
-      "Certified Lover Boy Drake",
-      "Harrys House Harry Styles",
-      "Sour Olivia Rodrigo",
-      "Future Nostalgia Dua Lipa",
-      "Positions Ariana Grande",
-      "Fine Line Harry Styles",
-      "When We All Fall Asleep Where Do We Go Billie Eilish",
-      "Melodrama Lorde",
-      "Scorpion Drake",
-      "The New Abnormal The Strokes",
-      "Is This It The Strokes",
+      "Watch the Throne Jay-Z Kanye West",
+      "Born to Die Lana Del Rey",
       "Norman Fucking Rockwell Lana Del Rey",
+      "Homogenic Bjork",
+      "Stankonia Outkast",
+      "In the Court of the Crimson King King Crimson",
+      "Dawn FM The Weeknd",
+      "After Hours The Weeknd",
+      "When We All Fall Asleep Where Do We Go Billie Eilish",
+      "Is This It The Strokes",
       "Ctrl SZA",
+      "Future Nostalgia Dua Lipa",
+      "Sour Olivia Rodrigo",
     ];
 
     Promise.all(
       ICONIC.map((q) =>
-        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=album&limit=1`)
+        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=1`)
           .then((r) => r.json())
           .then((d) => {
             const result = d.results?.[0];
-            if (!result?.artworkUrl100) return null;
+            if (!result?.artworkUrl100 || !result?.trackName) return null;
             return {
-              name:       result.collectionName as string,
-              artist:     result.artistName as string,
-              artworkUrl: (result.artworkUrl100 as string).replace("100x100", "600x600"),
+              name:         result.collectionName as string,
+              artist:       result.artistName as string,
+              artworkUrl:   (result.artworkUrl100 as string).replace("100x100", "600x600"),
+              trackName:    result.trackName as string,
+              collectionId: result.collectionId as number,
             } as TopAlbum;
           })
           .catch(() => null)
@@ -229,18 +238,27 @@ export default function Home() {
         setArtA(entries[0].artworkUrl);
         showArtRef.current = true;
         setShowArt(true);
+        setFeaturedAlbum(entries[0]);
+        setTimeout(() => setFeaturedVisible(true), 400);
       }
       if (entries.length > 1) setArtB(entries[1].artworkUrl);
     });
   }, []);
 
-  // ── Cycle art every 4s when on search step ──
+  // ── Cycle art every 7s when on search step ──
   useEffect(() => {
     if (step !== "search" || topAlbums.length < 2) return;
     const interval = setInterval(() => {
       cycleIndexRef.current = (cycleIndexRef.current + 1) % topAlbums.length;
-      transitionArt(topAlbums[cycleIndexRef.current].artworkUrl);
-    }, 4000);
+      const next = topAlbums[cycleIndexRef.current];
+      transitionArt(next.artworkUrl);
+      // Fade out featured info, swap, fade back in
+      setFeaturedVisible(false);
+      setTimeout(() => {
+        setFeaturedAlbum(next);
+        setFeaturedVisible(true);
+      }, 300);
+    }, 7000);
     return () => clearInterval(interval);
   }, [step, topAlbums, transitionArt]);
 
@@ -364,6 +382,39 @@ export default function Home() {
       setStep("typing");
     } catch { setError("Something went wrong fetching lyrics."); }
     finally  { setLoading(false); }
+  }
+
+  async function selectFeaturedSong(album: TopAlbum) {
+    const artUrl = album.artworkUrl;
+    if (previewHideRef.current) clearTimeout(previewHideRef.current);
+    setPreviewUrl(artUrl);
+    setShowPreview(true);
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(album.artist)}/${encodeURIComponent(album.trackName)}`);
+      if (!res.ok) { setError("Lyrics not found for this song."); return; }
+      const data = await res.json();
+      if (!data.lyrics) { setError("Lyrics not found for this song."); return; }
+      transitionArt(artUrl);
+      extractAccentColor(artUrl).then(setAccentColor);
+      setSongData({ lyrics: data.lyrics, songTitle: album.trackName, artist: album.artist, artworkUrl: artUrl });
+      setSelectedAlbum(null);
+      setShowPreview(false);
+      setStep("typing");
+    } catch { setError("Something went wrong fetching lyrics."); }
+    finally { setLoading(false); }
+  }
+
+  async function browseFeaturedAlbum(album: TopAlbum) {
+    const fakeAlbum: Album = {
+      collectionId:   album.collectionId,
+      collectionName: album.name,
+      artworkUrl100:  album.artworkUrl.replace("600x600", "100x100"),
+      artistName:     album.artist,
+    };
+    setSelectedArtist({ artistId: 0, artistName: album.artist });
+    await selectAlbum(fakeAlbum);
   }
 
   function goBack() {
@@ -533,21 +584,48 @@ export default function Home() {
                 </div>
               </div>
             ) : query.trim() === "" ? (
-              /* Empty state */
+              /* Featured track from current cycling album */
               <div className="flex-1 flex flex-col justify-center">
-                <p className="text-zinc-700 text-sm">
-                  Start typing to search across millions of songs.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {["Bohemian Rhapsody", "Blinding Lights", "Lose Yourself", "Hotline Bling"].map((hint) => (
-                    <button
-                      key={hint}
-                      onClick={() => setQuery(hint)}
-                      className="px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 text-xs hover:border-zinc-600 hover:text-zinc-300 transition-colors"
-                    >
-                      {hint}
-                    </button>
-                  ))}
+                <div
+                  className="transition-all duration-300"
+                  style={{ opacity: featuredVisible ? 1 : 0, transform: featuredVisible ? "translateY(0)" : "translateY(8px)" }}
+                >
+                  {featuredAlbum ? (
+                    <>
+                      <p className="text-zinc-600 text-xs uppercase tracking-widest mb-5 font-medium">Now Featuring</p>
+                      <div className="flex items-center gap-4 mb-6">
+                        <img
+                          src={featuredAlbum.artworkUrl.replace("600x600", "100x100")}
+                          alt={featuredAlbum.name}
+                          className="w-16 h-16 rounded-lg object-cover shrink-0 shadow-lg"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-white font-semibold text-base leading-tight truncate">{featuredAlbum.trackName}</p>
+                          <p className="text-zinc-400 text-sm mt-0.5 truncate">{featuredAlbum.name}</p>
+                          <p className="text-zinc-600 text-xs mt-0.5 truncate">{featuredAlbum.artist}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => selectFeaturedSong(featuredAlbum)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-semibold text-sm hover:bg-cyan-400 transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                          </svg>
+                          Start Typing
+                        </button>
+                        <button
+                          onClick={() => browseFeaturedAlbum(featuredAlbum)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 text-sm hover:text-white hover:bg-zinc-800 transition-colors"
+                        >
+                          Browse Album
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-zinc-700 text-sm">Start typing to search across millions of songs.</p>
+                  )}
                 </div>
               </div>
             ) : null}
