@@ -38,6 +38,49 @@ function bigArtwork(url: string) {
   return url.replace("100x100", "400x400");
 }
 
+function extractAccentColor(imageUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 60;
+        canvas.height = 60;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve("#22d3ee"); return; }
+        ctx.drawImage(img, 0, 0, 60, 60);
+        const { data } = ctx.getImageData(0, 0, 60, 60);
+
+        // Bucket pixels by hue, skipping near-grey / near-black / near-white
+        const buckets = new Array(36).fill(0);
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255;
+          const max = Math.max(r, g, b), min = Math.min(r, g, b);
+          const l = (max + min) / 2;
+          const s = max === min ? 0 : l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+          if (s < 0.3 || l < 0.15 || l > 0.85) continue;
+          let h = 0;
+          if (max === r)      h = ((g - b) / (max - min)) % 6;
+          else if (max === g) h = (b - r) / (max - min) + 2;
+          else                h = (r - g) / (max - min) + 4;
+          h = Math.round(h * 60);
+          if (h < 0) h += 360;
+          buckets[Math.floor(h / 10)]++;
+        }
+
+        const best = buckets.indexOf(Math.max(...buckets));
+        if (buckets[best] < 8) { resolve("#22d3ee"); return; } // image too grey — fall back
+        resolve(`hsl(${best * 10 + 5}, 75%, 62%)`);
+      } catch {
+        resolve("#22d3ee");
+      }
+    };
+    img.onerror = () => resolve("#22d3ee");
+    img.src = imageUrl;
+  });
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 export default function Home() {
   const [step, setStep]             = useState<Step>("search");
@@ -48,6 +91,7 @@ export default function Home() {
   const [selectedAlbum, setSelectedAlbum]   = useState<Album | null>(null);
   const [tracks, setTracks]         = useState<Track[]>([]);
   const [songData, setSongData]     = useState<SongData | null>(null);
+  const [accentColor, setAccentColor] = useState("#22d3ee");
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const debounceRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,7 +181,9 @@ export default function Home() {
       if (!res.ok) { setError("Lyrics not found for this song."); return; }
       const data = await res.json();
       if (!data.lyrics) { setError("Lyrics not found for this song."); return; }
-      setSongData({ lyrics: data.lyrics, songTitle: track.trackName, artist: selectedArtist.artistName, artworkUrl: selectedAlbum ? bigArtwork(selectedAlbum.artworkUrl100) : undefined });
+      const artUrl = selectedAlbum ? bigArtwork(selectedAlbum.artworkUrl100) : undefined;
+      setSongData({ lyrics: data.lyrics, songTitle: track.trackName, artist: selectedArtist.artistName, artworkUrl: artUrl });
+      if (artUrl) extractAccentColor(artUrl).then(setAccentColor);
       setStep("typing");
     } catch {
       setError("Something went wrong fetching lyrics.");
@@ -156,26 +202,28 @@ export default function Home() {
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <main
-      className="min-h-screen flex flex-col overflow-hidden"
-      style={{ background: "radial-gradient(ellipse at 50% 0%, #1a4a6b 0%, #0d2540 70%)" }}
+      className={step === "typing" ? "h-screen overflow-hidden flex" : "min-h-screen flex flex-col overflow-hidden"}
+      style={step !== "typing" ? { background: "radial-gradient(ellipse at 50% 0%, #1a4a6b 0%, #0d2540 70%)" } : undefined}
     >
-      {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 shrink-0">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-white">
-            Lyric<span className="text-cyan-400">Type</span>
-          </h1>
-          <p className="text-xs text-zinc-500 tracking-widest uppercase">Type the lyrics. Feel the music.</p>
-        </div>
-        {step !== "search" && (
-          <button
-            onClick={goBack}
-            className="step-enter rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
-          >
-            ← Back
-          </button>
-        )}
-      </header>
+      {/* Header — hidden during typing */}
+      {step !== "typing" && (
+        <header className="flex items-center justify-between px-8 py-5 shrink-0">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-white">
+              Lyric<span className="text-cyan-400">Type</span>
+            </h1>
+            <p className="text-xs text-zinc-500 tracking-widest uppercase">Type the lyrics. Feel the music.</p>
+          </div>
+          {step !== "search" && (
+            <button
+              onClick={goBack}
+              className="step-enter rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
+            >
+              ← Back
+            </button>
+          )}
+        </header>
+      )}
 
       {/* ── Search ── */}
       {step === "search" && (
@@ -275,27 +323,56 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── Typing ── */}
+      {/* ── Typing: split layout ── */}
       {step === "typing" && songData && (
-        <div key="typing" className="step-enter flex flex-1 flex-col items-center px-4 pt-6 gap-6">
-          <div className="flex items-center gap-5">
-            {songData.artworkUrl && (
+        <div key="typing" className="step-enter flex w-full h-full">
+
+          {/* Left: album art fills full height */}
+          <div className="relative w-[42%] shrink-0 h-full bg-black">
+            {songData.artworkUrl ? (
               <img
                 src={songData.artworkUrl}
                 alt={songData.songTitle}
-                className="w-20 h-20 rounded-lg object-cover shadow-lg shadow-black/40 shrink-0"
+                className="w-full h-full object-contain"
               />
+            ) : (
+              <div className="w-full h-full bg-zinc-900" />
             )}
-            <div>
-              <h2 className="text-4xl font-bold text-white tracking-tight">{songData.songTitle}</h2>
-              <p className="text-zinc-400 mt-1">{songData.artist}</p>
+            {/* Fade into right panel */}
+            <div className="absolute inset-y-0 right-0 w-10 bg-gradient-to-r from-transparent to-black pointer-events-none" />
+            {/* Logo watermark */}
+            <div className="absolute bottom-6 left-6">
+              <span className="text-sm font-black tracking-tight text-white/40">
+                Lyric<span className="text-cyan-400/40">Type</span>
+              </span>
             </div>
           </div>
-          <TypingTest
-            lyrics={songData.lyrics}
-            songTitle={songData.songTitle}
-            artist={songData.artist}
-          />
+
+          {/* Right: black panel */}
+          <div className="flex-1 bg-black flex flex-col px-12 py-8 overflow-hidden">
+            {/* Song info + back button */}
+            <div className="flex items-start justify-between mb-8 shrink-0">
+              <div>
+                <h2 className="text-3xl font-bold text-white tracking-tight leading-tight">{songData.songTitle}</h2>
+                <p className="text-zinc-500 mt-1 text-sm">{songData.artist}</p>
+              </div>
+              <button
+                onClick={goBack}
+                className="rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors shrink-0 ml-8"
+              >
+                ← Back
+              </button>
+            </div>
+
+            {/* Typing engine */}
+            <TypingTest
+              lyrics={songData.lyrics}
+              songTitle={songData.songTitle}
+              artist={songData.artist}
+              accentColor={accentColor}
+            />
+          </div>
+
         </div>
       )}
     </main>

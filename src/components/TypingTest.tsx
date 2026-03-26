@@ -6,6 +6,7 @@ interface TypingTestProps {
   lyrics: string;
   songTitle: string;
   artist: string;
+  accentColor?: string;
 }
 
 type CharState = "pending" | "correct" | "incorrect" | "active";
@@ -17,10 +18,10 @@ const CLASS: Record<CharState, string> = {
   pending:   "relative text-zinc-600",
   correct:   "relative text-zinc-300",
   incorrect: "relative text-red-400 bg-red-900/20",
-  active:    "relative text-zinc-600 after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-cyan-400 after:animate-pulse",
+  active:    "relative text-zinc-600 after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-[var(--lyric-accent)] after:animate-pulse",
 };
 
-export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProps) {
+export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#22d3ee" }: TypingTestProps) {
   const charsRef      = useRef<CharState[]>([]);
   const cursorRef     = useRef(0);
   const finishedRef   = useRef(false);
@@ -106,7 +107,7 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
     if (charDomRefs.current[index]?.dataset.newline) {
       // Newline span: only show ↵ when active, invisible otherwise
       el.className = state === "active"
-        ? "relative text-zinc-500 after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-cyan-400 after:animate-pulse"
+        ? "relative text-zinc-500 after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-[var(--lyric-accent)] after:animate-pulse"
         : "relative opacity-0 select-none";
     } else {
       el.className = CLASS[state];
@@ -267,16 +268,16 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
   const handleRestart = () => { initState(); };
 
   return (
-    <div className="flex flex-col items-center w-full max-w-3xl gap-6">
+    <div className="flex flex-col items-center w-full gap-6" style={{ "--lyric-accent": accentColor } as React.CSSProperties}>
       {/* Stats + progress bar */}
       <div className="flex items-center justify-center gap-6">
         <div className="flex items-center gap-6 shrink-0">
           <div className="text-center">
-            <div className="text-5xl font-bold font-mono text-yellow-400">{wpm || "—"}</div>
+            <div className="text-5xl font-bold font-mono" style={{ color: accentColor }}>{wpm || "—"}</div>
             <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">WPM</div>
           </div>
           <div className="text-center">
-            <div className="text-5xl font-bold font-mono text-yellow-400">{started ? `${accuracy}%` : "—"}</div>
+            <div className="text-5xl font-bold font-mono" style={{ color: accentColor }}>{started ? `${accuracy}%` : "—"}</div>
             <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">Accuracy</div>
           </div>
         </div>
@@ -284,13 +285,13 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
         <div className="relative w-56 h-3 bg-zinc-800 rounded-full">
           <div
             ref={progressFillRef}
-            className="h-full bg-cyan-500/50 rounded-full"
-            style={{ width: "0%", transition: "width 0.1s ease-out" }}
+            className="h-full rounded-full"
+            style={{ width: "0%", transition: "width 0.1s ease-out", backgroundColor: accentColor, opacity: 0.5 }}
           />
           <span
             ref={progressNoteRef}
-            className="absolute -top-5 text-2xl leading-none -translate-x-1/2 text-cyan-400 select-none"
-            style={{ left: "0%", transition: "left 0.1s ease-out" }}
+            className="absolute -top-5 text-2xl leading-none -translate-x-1/2 select-none"
+            style={{ left: "0%", transition: "left 0.1s ease-out", color: accentColor }}
           >
             ♪
           </span>
@@ -336,11 +337,12 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
 
       {finished && (
         <div className="flex flex-col items-center gap-4 rounded-lg bg-zinc-800 px-10 py-6 text-center">
-          <p className="text-2xl font-bold text-yellow-400">{wpm} WPM</p>
+          <p className="text-2xl font-bold" style={{ color: accentColor }}>{wpm} WPM</p>
           <p className="text-zinc-300 text-sm">Accuracy: {accuracy}%</p>
           <button
             onClick={handleRestart}
-            className="mt-2 rounded-full bg-yellow-400 px-6 py-2 text-sm font-semibold text-zinc-900 hover:bg-yellow-300 transition-colors"
+            className="mt-2 rounded-full px-6 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:opacity-90"
+            style={{ backgroundColor: accentColor }}
           >
             Try Again
           </button>
