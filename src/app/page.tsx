@@ -404,10 +404,10 @@ export default function Home() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <main className="h-screen overflow-hidden flex bg-[#1a1a1a]">
+    <main className="h-screen overflow-hidden flex bg-[#252525]">
 
       {/* ── Left panel: full-bleed art with depth effect ── */}
-      <div className="relative w-[42%] shrink-0 h-full bg-[#1a1a1a] p-2.5">
+      <div className="relative w-[42%] shrink-0 h-full bg-[#252525] p-2.5">
         {/* Art fills the padded area — thin background border creates depth */}
         <div className="relative w-full h-full rounded-lg overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.7)]">
           {artA && (
@@ -433,7 +433,7 @@ export default function Home() {
       </div>
 
       {/* ── Right panel ── */}
-      <div className="flex-1 bg-[#1a1a1a] flex flex-col overflow-hidden">
+      <div className="flex-1 bg-[#252525] flex flex-col overflow-hidden">
 
         {/* ── Search ── */}
         {step === "search" && (
@@ -679,13 +679,15 @@ export default function Home() {
               <p className="text-zinc-500 text-sm mt-1">{songData.artist}</p>
             </div>
 
-            <TypingTest
-              lyrics={songData.lyrics}
-              songTitle={songData.songTitle}
-              artist={songData.artist}
-              accentColor={accentColor}
-              onBack={goBack}
-            />
+            <div className="flex-1 min-h-0">
+              <TypingTest
+                lyrics={songData.lyrics}
+                songTitle={songData.songTitle}
+                artist={songData.artist}
+                accentColor={accentColor}
+                onBack={goBack}
+              />
+            </div>
           </div>
         )}
 
