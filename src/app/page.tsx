@@ -92,29 +92,6 @@ function extractAccentColor(imageUrl: string): Promise<string> {
   });
 }
 
-// Logo mark — reused in left panel and header
-function LogoMark({ size = "md" }: { size?: "sm" | "md" }) {
-  const box = size === "sm" ? "w-6 h-6 rounded-md" : "w-9 h-9 rounded-lg";
-  const icon = size === "sm" ? "w-3.5 h-3.5" : "w-5 h-5";
-  const text = size === "sm" ? "text-lg" : "text-2xl";
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className={`${box} bg-cyan-500 flex items-center justify-center shrink-0`}>
-        <svg className={`${icon} text-black`} viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>
-      </div>
-      <div>
-        <div className={`${text} font-black tracking-tight text-white leading-none`}>
-          Lyric<span className="text-cyan-400">Type</span>
-        </div>
-        {size === "md" && (
-          <div className="text-xs text-zinc-600 tracking-widest uppercase mt-0.5">Type the lyrics.</div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Component ──────────────────────────────────────────────────────────────
 export default function Home() {
@@ -149,7 +126,8 @@ export default function Home() {
   const [featuredVisible, setFeaturedVisible] = useState(false);
   const cycleIndexRef                   = useRef(0);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSearching  = query.trim() !== "";
 
   // Crossfade left panel to a new url
   const transitionArt = useCallback((newUrl: string) => {
@@ -209,7 +187,6 @@ export default function Home() {
       "When We All Fall Asleep Where Do We Go Billie Eilish",
       "Is This It The Strokes",
       "Ctrl SZA",
-      "Future Nostalgia Dua Lipa",
       "Sour Olivia Rodrigo",
     ];
 
@@ -488,29 +465,51 @@ export default function Home() {
 
         {/* ── Search ── */}
         {step === "search" && (
-          <div key="search" className="step-enter flex flex-col px-10 py-10 h-full overflow-y-auto">
-            <div className="mb-8">
-              <LogoMark />
+          <div key="search" className="step-enter flex flex-col h-full overflow-hidden">
+
+            {/* Logo — animates from big/centered to small/corner */}
+            <div className={`shrink-0 transition-all duration-500 ease-in-out flex items-center gap-3 ${
+              isSearching ? "px-10 pt-8 pb-0 justify-start" : "justify-center pt-14 pb-6"
+            }`}>
+              <div className={`bg-cyan-500 flex items-center justify-center shrink-0 transition-all duration-500 ${
+                isSearching ? "w-6 h-6 rounded-md" : "w-14 h-14 rounded-2xl"
+              }`}>
+                <svg className={`text-black transition-all duration-500 ${isSearching ? "w-3.5 h-3.5" : "w-8 h-8"}`} viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                </svg>
+              </div>
+              <div>
+                <div className={`font-black tracking-tight text-white leading-none transition-all duration-500 ${isSearching ? "text-xl" : "text-5xl"}`}>
+                  Lyric<span className="text-cyan-400">Type</span>
+                </div>
+                <div className={`text-xs text-zinc-600 tracking-widest uppercase mt-1 transition-all duration-300 overflow-hidden ${
+                  isSearching ? "opacity-0 max-h-0 mt-0" : "opacity-100 max-h-4"
+                }`}>
+                  Type the lyrics.
+                </div>
+              </div>
             </div>
 
-            {/* Search input */}
-            <div className="relative">
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-              </svg>
-              <input
-                type="text"
-                placeholder="Search songs, albums, or artists..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                autoFocus
-                className="w-full rounded-xl bg-zinc-900/60 border border-zinc-800 pl-10 pr-4 py-3.5 text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-600 focus:bg-zinc-800/60 transition-all text-sm"
-              />
+            {/* Search bar — narrows when centered */}
+            <div className={`shrink-0 transition-all duration-300 ${isSearching ? "px-10 mt-5" : "flex justify-center mt-3 px-10"}`}>
+              <div className={`relative transition-all duration-300 ${isSearching ? "w-full" : "w-80"}`}>
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search songs, albums, or artists..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  autoFocus
+                  className="w-full rounded-xl bg-zinc-900/60 border border-zinc-800 pl-10 pr-4 py-3.5 text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-600 focus:bg-zinc-800/60 transition-all text-sm"
+                />
+              </div>
             </div>
 
-            {error   && <p className="text-red-400 text-sm mt-3">{error}</p>}
+            {error   && <p className="text-red-400 text-sm mt-3 px-10 shrink-0">{error}</p>}
             {loading && (
-              <div className="flex items-center gap-2 mt-4 text-zinc-600 text-sm">
+              <div className="flex items-center gap-2 mt-4 px-10 text-zinc-600 text-sm shrink-0">
                 <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="20 60" />
                 </svg>
@@ -520,7 +519,7 @@ export default function Home() {
 
             {/* Results */}
             {(songs.length > 0 || albumResults.length > 0 || artists.length > 0) ? (
-              <div className="results-enter mt-6 flex gap-5 flex-1 min-h-0">
+              <div className="results-enter mt-6 flex gap-5 flex-1 min-h-0 px-10 overflow-y-auto">
                 {/* Songs */}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 font-medium">Songs</p>
@@ -583,52 +582,54 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-            ) : query.trim() === "" ? (
-              /* Featured track from current cycling album */
-              <div className="flex-1 flex flex-col justify-center">
-                <div
-                  className="transition-all duration-300"
-                  style={{ opacity: featuredVisible ? 1 : 0, transform: featuredVisible ? "translateY(0)" : "translateY(8px)" }}
-                >
-                  {featuredAlbum ? (
-                    <>
-                      <p className="text-zinc-600 text-xs uppercase tracking-widest mb-5 font-medium">Now Featuring</p>
-                      <div className="flex items-center gap-4 mb-6">
-                        <img
-                          src={featuredAlbum.artworkUrl.replace("600x600", "100x100")}
-                          alt={featuredAlbum.name}
-                          className="w-16 h-16 rounded-lg object-cover shrink-0 shadow-lg"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-white font-semibold text-base leading-tight truncate">{featuredAlbum.trackName}</p>
-                          <p className="text-zinc-400 text-sm mt-0.5 truncate">{featuredAlbum.name}</p>
-                          <p className="text-zinc-600 text-xs mt-0.5 truncate">{featuredAlbum.artist}</p>
-                        </div>
+            ) : (
+              /* Spacer pushes featuring to bottom */
+              <div className="flex-1" />
+            )}
+
+            {/* Now Featuring — pinned to bottom, only on empty state */}
+            {!isSearching && (
+              <div
+                className="shrink-0 px-10 pb-10 transition-all duration-300"
+                style={{ opacity: featuredVisible ? 1 : 0, transform: featuredVisible ? "translateY(0)" : "translateY(10px)" }}
+              >
+                {featuredAlbum && (
+                  <>
+                    <p className="text-zinc-600 text-xs uppercase tracking-widest mb-4 font-medium">Now Featuring</p>
+                    <div className="flex items-center gap-4 mb-5">
+                      <img
+                        src={featuredAlbum.artworkUrl.replace("600x600", "100x100")}
+                        alt={featuredAlbum.name}
+                        className="w-14 h-14 rounded-lg object-cover shrink-0 shadow-lg"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-white font-semibold text-sm leading-tight truncate">{featuredAlbum.trackName}</p>
+                        <p className="text-zinc-400 text-xs mt-0.5 truncate">{featuredAlbum.name}</p>
+                        <p className="text-zinc-600 text-xs mt-0.5 truncate">{featuredAlbum.artist}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => selectFeaturedSong(featuredAlbum)}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-semibold text-sm hover:bg-cyan-400 transition-colors"
-                        >
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                          </svg>
-                          Start Typing
-                        </button>
-                        <button
-                          onClick={() => browseFeaturedAlbum(featuredAlbum)}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 text-sm hover:text-white hover:bg-zinc-800 transition-colors"
-                        >
-                          Browse Album
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-zinc-700 text-sm">Start typing to search across millions of songs.</p>
-                  )}
-                </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => selectFeaturedSong(featuredAlbum)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-semibold text-sm hover:bg-cyan-400 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                        </svg>
+                        Start Typing
+                      </button>
+                      <button
+                        onClick={() => browseFeaturedAlbum(featuredAlbum)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 text-sm hover:text-white hover:bg-zinc-800 transition-colors"
+                      >
+                        Browse Album
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
-            ) : null}
+            )}
+
           </div>
         )}
 
@@ -757,7 +758,7 @@ export default function Home() {
               <p className="text-zinc-500 text-sm mt-1">{songData.artist}</p>
             </div>
 
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 flex flex-col">
               <TypingTest
                 lyrics={songData.lyrics}
                 songTitle={songData.songTitle}

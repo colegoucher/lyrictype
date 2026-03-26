@@ -282,7 +282,7 @@ export default function TypingTest({
 
   return (
     <div
-      className="flex flex-col w-full h-full"
+      className="flex flex-col w-full flex-1 min-h-0"
       style={{ "--lyric-accent": accentColor } as React.CSSProperties}
     >
       {finished ? (
@@ -294,18 +294,18 @@ export default function TypingTest({
             <p className="text-zinc-500 text-sm mt-0.5">{artist}</p>
           </div>
 
-          {/* Stats row — all same baseline */}
-          <div className="flex items-end gap-10">
+          {/* Stats row */}
+          <div className="flex items-center gap-8">
             <div className="text-center">
               <div className="text-5xl font-bold font-mono leading-none" style={{ color: accentColor }}>{wpm}</div>
               <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">WPM</div>
             </div>
-            <div className="w-px h-10 bg-zinc-800 mb-5" />
+            <div className="w-px h-14 bg-zinc-800" />
             <div className="text-center">
               <div className="text-5xl font-bold font-mono leading-none" style={{ color: accentColor }}>{accuracy}%</div>
               <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">Accuracy</div>
             </div>
-            <div className="w-px h-10 bg-zinc-800 mb-5" />
+            <div className="w-px h-14 bg-zinc-800" />
             <div className="text-center">
               <div className="text-5xl font-bold font-mono leading-none text-zinc-400">{formatTime(elapsed)}</div>
               <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">Time</div>
