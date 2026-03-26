@@ -7,6 +7,7 @@ interface TypingTestProps {
   songTitle: string;
   artist: string;
   accentColor?: string;
+  onBack?: () => void;
 }
 
 type CharState = "pending" | "correct" | "incorrect" | "active";
@@ -18,10 +19,16 @@ const CLASS: Record<CharState, string> = {
   pending:   "relative text-zinc-600",
   correct:   "relative text-zinc-300",
   incorrect: "relative text-red-400 bg-red-900/20",
-  active:    "relative text-zinc-600 after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-[var(--lyric-accent)] after:animate-pulse",
+  active:    "relative text-zinc-600 before:absolute before:-left-px before:top-0 before:h-full before:w-0.5 before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]",
 };
 
-export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#22d3ee" }: TypingTestProps) {
+export default function TypingTest({
+  lyrics,
+  songTitle,
+  artist,
+  accentColor = "#22d3ee",
+  onBack,
+}: TypingTestProps) {
   const charsRef      = useRef<CharState[]>([]);
   const cursorRef     = useRef(0);
   const finishedRef   = useRef(false);
@@ -34,23 +41,29 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
   const [finished, setFinished] = useState(false);
   const [wpm,      setWpm]      = useState(0);
   const [accuracy, setAccuracy] = useState(100);
-  const [errors,   setErrors]   = useState(0);
+  const [elapsed,  setElapsed]  = useState(0);
 
-  const scrollRef      = useRef<HTMLDivElement>(null);
-  const charDomRefs    = useRef<(HTMLSpanElement | null)[]>([]);
-  const lineDomRefs    = useRef<(HTMLDivElement | null)[]>([]);
+  const scrollRef       = useRef<HTMLDivElement>(null);
+  const charDomRefs     = useRef<(HTMLSpanElement | null)[]>([]);
+  const lineDomRefs     = useRef<(HTMLDivElement | null)[]>([]);
   const progressFillRef = useRef<HTMLDivElement>(null);
   const progressNoteRef = useRef<HTMLSpanElement>(null);
+  const wpmDomRef       = useRef<HTMLSpanElement>(null);
+  const accDomRef       = useRef<HTMLSpanElement>(null);
 
   useEffect(() => { finishedRef.current = finished; }, [finished]);
 
+  // Live WPM ticker
   useEffect(() => {
     if (!started || finished) return;
     const interval = setInterval(() => {
       if (!startTimeRef.current) return;
-      const elapsed = (Date.now() - startTimeRef.current) / 1000 / 60;
+      const mins = (Date.now() - startTimeRef.current) / 1000 / 60;
       const correctChars = charsRef.current.filter(s => s === "correct").length;
-      setWpm(Math.round((correctChars / 5) / elapsed));
+      const live = Math.round((correctChars / 5) / mins);
+      setWpm(live);
+      setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      if (wpmDomRef.current) wpmDomRef.current.textContent = String(live);
     }, 500);
     return () => clearInterval(interval);
   }, [started, finished]);
@@ -62,14 +75,14 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
 
   const cleanLyrics = useCallback((raw: string) => {
     return raw
-      .replace(/\r/g, "")                                          // strip \r from Windows line endings
-      .replace(/[\u00AD\u200B\u200C\u200D\uFEFF\u2060]/g, "")     // strip invisible/zero-width chars (soft hyphen, ZWS, BOM, etc.)
-      .replace(/\u00A0/g, " ")                                     // non-breaking space → regular space
-      .replace(/[\u2018\u2019]/g, "'")                             // curly apostrophes → straight
-      .replace(/[\u201C\u201D]/g, '"')                             // curly quotes → straight
-      .replace(/[\u2013\u2014\u2015\u2010\u2011]/g, "-")          // all dash variants → hyphen-minus
-      .replace(/\[.*?\]/g, "")                                     // remove [Verse], [Chorus] etc.
-      .replace(/\n{3,}/g, "\n\n")                                  // collapse 3+ blank lines
+      .replace(/\r/g, "")
+      .replace(/[\u00AD\u200B\u200C\u200D\uFEFF\u2060]/g, "")
+      .replace(/\u00A0/g, " ")
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2013\u2014\u2015\u2010\u2011]/g, "-")
+      .replace(/\[.*?\]/g, "")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
   }, []);
 
@@ -85,7 +98,6 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
     return map;
   }, [text]);
 
-  // Include newline chars as entries so they get a DOM span and can hold the cursor
   const lineChars = useMemo(() => {
     const result: Array<{ char: string; index: number; isNewline?: boolean }[]> = [];
     let charIdx = 0;
@@ -105,9 +117,8 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
     const el = charDomRefs.current[index];
     if (!el) return;
     if (charDomRefs.current[index]?.dataset.newline) {
-      // Newline span: only show ↵ when active, invisible otherwise
       el.className = state === "active"
-        ? "relative text-zinc-500 after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-[var(--lyric-accent)] after:animate-pulse"
+        ? "relative text-zinc-500 before:absolute before:-left-px before:top-0 before:h-full before:w-0.5 before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]"
         : "relative opacity-0 select-none";
     } else {
       el.className = CLASS[state];
@@ -130,7 +141,6 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
   const initState = useCallback(() => {
     const initial: CharState[] = text.split("").map(() => "pending");
     let p = 0;
-    // Only skip leading newlines (shouldn't happen after trim, but just in case)
     while (p < text.length && text[p] === "\n") { initial[p] = "correct"; p++; }
     if (p < text.length) initial[p] = "active";
 
@@ -146,12 +156,14 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
     setFinished(false);
     setWpm(0);
     setAccuracy(100);
-    setErrors(0);
+    setElapsed(0);
 
     requestAnimationFrame(() => {
       initial.forEach((state, i) => setCharDom(i, state));
       scrollToLine(charToLine[p] ?? 0);
       updateProgress(p);
+      if (wpmDomRef.current) wpmDomRef.current.textContent = "—";
+      if (accDomRef.current) accDomRef.current.textContent = "—";
     });
   }, [text, charToLine]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -160,27 +172,28 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // Tab = restart
+      if (e.key === "Tab") { e.preventDefault(); initState(); return; }
+      if (e.key === "Escape") { e.preventDefault(); onBack?.(); return; }
+
       if (finishedRef.current) return;
 
       const key = e.key;
       const cur = cursorRef.current;
 
-      // ── Backspace ──────────────────────────────────────────────────────
+      // Backspace
       if (key === "Backspace") {
         e.preventDefault();
         if (cur === 0) return;
-
         setCharDom(cur, "pending");
         charsRef.current[cur] = "pending";
-
-        // Go back, skipping newlines
         let p = cur - 1;
         while (p > 0 && text[p] === "\n") {
           setCharDom(p, "pending");
           charsRef.current[p] = "pending";
           p--;
         }
-
         setCharDom(p, "active");
         charsRef.current[p] = "active";
         cursorRef.current = p;
@@ -189,28 +202,28 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
         return;
       }
 
-      // ── Space at a newline — advance to next line ───────────────────────
+      // Space at newline → advance
       if (text[cur] === "\n") {
-        if (key !== " ") return; // only space advances past newlines
+        if (key !== " ") return;
         e.preventDefault();
-
         let p = cur;
         while (p < text.length && text[p] === "\n") {
           setCharDom(p, "correct");
           charsRef.current[p] = "correct";
           p++;
         }
-
         if (p >= text.length) {
-          finishedRef.current = true;
-          const elapsed = (Date.now() - (startTimeRef.current ?? Date.now())) / 1000 / 60;
+          const mins = (Date.now() - (startTimeRef.current ?? Date.now())) / 1000 / 60;
           const correctChars = charsRef.current.filter(s => s === "correct").length;
-          setWpm(Math.round((correctChars / 5) / elapsed));
-          setAccuracy(Math.round(((totalTypedRef.current - errorsRef.current) / totalTypedRef.current) * 100));
+          const finalWpm = Math.round((correctChars / 5) / mins);
+          const finalAcc = Math.round(((totalTypedRef.current - errorsRef.current) / Math.max(totalTypedRef.current, 1)) * 100);
+          setWpm(finalWpm);
+          setAccuracy(finalAcc);
+          setElapsed(Math.floor((Date.now() - (startTimeRef.current ?? Date.now())) / 1000));
+          finishedRef.current = true;
           setFinished(true);
           return;
         }
-
         setCharDom(p, "active");
         charsRef.current[p] = "active";
         cursorRef.current = p;
@@ -219,7 +232,7 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
         return;
       }
 
-      // ── Regular character ───────────────────────────────────────────────
+      // Regular character
       if (key.length !== 1) return;
       e.preventDefault();
 
@@ -232,130 +245,185 @@ export default function TypingTest({ lyrics, songTitle, artist, accentColor = "#
       const isCorrect = key === text[cur];
       totalTypedRef.current += 1;
       if (!isCorrect) errorsRef.current += 1;
-      setErrors(errorsRef.current);
-      setAccuracy(Math.round(((totalTypedRef.current - errorsRef.current) / totalTypedRef.current) * 100));
+
+      const acc = Math.round(((totalTypedRef.current - errorsRef.current) / totalTypedRef.current) * 100);
+      if (accDomRef.current) accDomRef.current.textContent = `${acc}%`;
 
       setCharDom(cur, isCorrect ? "correct" : "incorrect");
       charsRef.current[cur] = isCorrect ? "correct" : "incorrect";
 
       const p = cur + 1;
-
       if (p >= text.length) {
-        finishedRef.current = true;
-        const elapsed = (Date.now() - (startTimeRef.current ?? Date.now())) / 1000 / 60;
+        const mins = (Date.now() - (startTimeRef.current ?? Date.now())) / 1000 / 60;
         const correctChars = charsRef.current.filter(s => s === "correct").length;
-        setWpm(Math.round((correctChars / 5) / elapsed));
-        setAccuracy(Math.round(((totalTypedRef.current - errorsRef.current) / totalTypedRef.current) * 100));
+        const finalWpm = Math.round((correctChars / 5) / mins);
+        const finalAcc = Math.round(((totalTypedRef.current - errorsRef.current) / Math.max(totalTypedRef.current, 1)) * 100);
+        setWpm(finalWpm);
+        setAccuracy(finalAcc);
+        setElapsed(Math.floor((Date.now() - (startTimeRef.current ?? Date.now())) / 1000));
+        finishedRef.current = true;
         setFinished(true);
         return;
       }
 
-      // If next char is a newline, show cursor on the ↵ span
       setCharDom(p, "active");
       charsRef.current[p] = "active";
       cursorRef.current = p;
       updateProgress(p);
-
-      // Only scroll if the newline takes us to the next line
       const newLine = text[p] === "\n" ? charToLine[p + 1] ?? charToLine[p] ?? 0 : charToLine[p] ?? 0;
       scrollToLine(newLine);
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [text, charToLine]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [text, charToLine, initState, onBack]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleRestart = () => { initState(); };
+  const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   return (
-    <div className="flex flex-col items-center w-full gap-6" style={{ "--lyric-accent": accentColor } as React.CSSProperties}>
-      {/* Stats + progress bar */}
-      <div className="flex items-center justify-center gap-6">
-        <div className="flex items-center gap-6 shrink-0">
+    <div
+      className="flex flex-col w-full h-full"
+      style={{ "--lyric-accent": accentColor } as React.CSSProperties}
+    >
+      {finished ? (
+        /* ── Completion screen ── */
+        <div className="completion-enter flex flex-col items-center justify-center flex-1 gap-10">
+          {/* Song info */}
           <div className="text-center">
-            <div className="text-5xl font-bold font-mono" style={{ color: accentColor }}>{wpm || "—"}</div>
-            <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">WPM</div>
+            <p className="text-white font-semibold text-base">{songTitle}</p>
+            <p className="text-zinc-500 text-sm mt-0.5">{artist}</p>
           </div>
-          <div className="text-center">
-            <div className="text-5xl font-bold font-mono" style={{ color: accentColor }}>{started ? `${accuracy}%` : "—"}</div>
-            <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">Accuracy</div>
-          </div>
-        </div>
 
-        <div className="relative w-56 h-3 bg-zinc-800 rounded-full">
-          <div
-            ref={progressFillRef}
-            className="h-full rounded-full"
-            style={{ width: "0%", transition: "width 0.1s ease-out", backgroundColor: accentColor, opacity: 0.5 }}
-          />
-          <span
-            ref={progressNoteRef}
-            className="absolute -top-5 text-2xl leading-none -translate-x-1/2 select-none"
-            style={{ left: "0%", transition: "left 0.1s ease-out", color: accentColor }}
-          >
-            ♪
-          </span>
-        </div>
-      </div>
-
-      <div
-        className="relative w-full cursor-text overflow-hidden"
-        style={{
-          height: CONTAINER_HEIGHT,
-          maskImage: "linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%)",
-        }}
-      >
-        <div
-          ref={scrollRef}
-          className="absolute inset-x-0 px-8"
-          style={{ willChange: "transform", transition: "transform 0.12s ease-out" }}
-        >
-          {lineChars.map((line, lineIndex) => (
-            <div
-              key={lineIndex}
-              ref={(el) => { lineDomRefs.current[lineIndex] = el; }}
-              className="font-mono text-3xl py-1"
-            >
-              {line.length === 0 ? (
-                <span className="opacity-0">|</span>
-              ) : (
-                line.map(({ char, index, isNewline }) => (
-                  <span
-                    key={index}
-                    ref={(el) => { charDomRefs.current[index] = el; }}
-                    data-newline={isNewline ? "1" : undefined}
-                    className={isNewline ? "relative opacity-0 select-none" : CLASS["pending"]}
-                  >
-                    {isNewline ? " " : char}
-                  </span>
-                ))
-              )}
+          {/* Stats row — all same baseline */}
+          <div className="flex items-end gap-10">
+            <div className="text-center">
+              <div className="text-5xl font-bold font-mono leading-none" style={{ color: accentColor }}>{wpm}</div>
+              <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">WPM</div>
             </div>
-          ))}
-        </div>
-      </div>
+            <div className="w-px h-10 bg-zinc-800 mb-5" />
+            <div className="text-center">
+              <div className="text-5xl font-bold font-mono leading-none" style={{ color: accentColor }}>{accuracy}%</div>
+              <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">Accuracy</div>
+            </div>
+            <div className="w-px h-10 bg-zinc-800 mb-5" />
+            <div className="text-center">
+              <div className="text-5xl font-bold font-mono leading-none text-zinc-400">{formatTime(elapsed)}</div>
+              <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">Time</div>
+            </div>
+          </div>
 
-      {finished && (
-        <div className="flex flex-col items-center gap-4 rounded-lg bg-zinc-800 px-10 py-6 text-center">
-          <p className="text-2xl font-bold" style={{ color: accentColor }}>{wpm} WPM</p>
-          <p className="text-zinc-300 text-sm">Accuracy: {accuracy}%</p>
-          <button
-            onClick={handleRestart}
-            className="mt-2 rounded-full px-6 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:opacity-90"
-            style={{ backgroundColor: accentColor }}
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button
+              onClick={initState}
+              className="px-6 py-2.5 rounded-lg text-sm font-semibold text-zinc-900 transition-all hover:opacity-90 active:scale-95"
+              style={{ backgroundColor: accentColor }}
+            >
+              Try Again
+            </button>
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="px-6 py-2.5 rounded-lg text-sm font-semibold bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-all"
+              >
+                Pick Another Song
+              </button>
+            )}
+          </div>
+
+          <p className="text-zinc-700 text-xs">Tab to restart · Esc to go back</p>
+        </div>
+      ) : (
+        /* ── Typing view ── */
+        <div className="flex flex-col flex-1 gap-6">
+          {/* Stats + progress */}
+          <div className="flex items-center justify-center gap-6 shrink-0">
+            <div className="flex items-center gap-6 shrink-0">
+              <div className="text-center">
+                <span ref={wpmDomRef} className="text-5xl font-bold font-mono" style={{ color: accentColor }}>—</span>
+                <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">WPM</div>
+              </div>
+              <div className="text-center">
+                <span ref={accDomRef} className="text-5xl font-bold font-mono" style={{ color: accentColor }}>—</span>
+                <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">Accuracy</div>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="relative w-56 h-3 bg-zinc-800 rounded-full">
+              <div
+                ref={progressFillRef}
+                className="h-full rounded-full"
+                style={{ width: "0%", transition: "width 0.1s ease-out", backgroundColor: accentColor, opacity: 0.5 }}
+              />
+              <span
+                ref={progressNoteRef}
+                className="absolute -top-5 text-2xl leading-none -translate-x-1/2 select-none"
+                style={{ left: "0%", transition: "left 0.1s ease-out", color: accentColor }}
+              >
+                ♪
+              </span>
+            </div>
+          </div>
+
+          {/* Lyrics area */}
+          <div
+            className="relative w-full cursor-text overflow-hidden flex-1"
+            style={{
+              maxHeight: CONTAINER_HEIGHT,
+              maskImage: "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
+            }}
           >
-            Try Again
-          </button>
-        </div>
-      )}
+            <div
+              ref={scrollRef}
+              className="absolute inset-x-0 px-1"
+              style={{ willChange: "transform", transition: "transform 0.12s ease-out" }}
+            >
+              {lineChars.map((line, lineIndex) => (
+                <div
+                  key={lineIndex}
+                  ref={(el) => { lineDomRefs.current[lineIndex] = el; }}
+                  className="font-mono text-3xl py-1"
+                >
+                  {line.length === 0 ? (
+                    <span className="opacity-0 select-none">|</span>
+                  ) : (
+                    line.map(({ char, index, isNewline }) => (
+                      <span
+                        key={index}
+                        ref={(el) => { charDomRefs.current[index] = el; }}
+                        data-newline={isNewline ? "1" : undefined}
+                        className={isNewline ? "relative opacity-0 select-none" : CLASS["pending"]}
+                      >
+                        {isNewline ? " " : char}
+                      </span>
+                    ))
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
 
-      {!finished && (
-        <button
-          onClick={handleRestart}
-          className="fixed bottom-8 rounded-full bg-zinc-800 border border-zinc-700 px-6 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
-        >
-          Restart
-        </button>
+          {/* Action buttons */}
+          <div className="mt-auto shrink-0 flex items-center gap-3">
+            <button
+              onClick={initState}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs"
+            >
+              <kbd className="font-mono text-zinc-600 text-xs">Tab</kbd>
+              Restart
+            </button>
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs"
+              >
+                <kbd className="font-mono text-zinc-600 text-xs">Esc</kbd>
+                Back
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
