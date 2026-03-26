@@ -17,32 +17,42 @@ const CLASS: Record<CharState, string> = {
   pending:   "relative text-zinc-600",
   correct:   "relative text-zinc-300",
   incorrect: "relative text-red-400 bg-red-900/20",
-  active:    "relative text-zinc-600 after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-violet-400 after:animate-pulse",
+  active:    "relative text-zinc-600 after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-cyan-400 after:animate-pulse",
 };
 
 export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProps) {
-  // All mutable logic lives in refs — zero stale closures, handler registered once
-  const charsRef    = useRef<CharState[]>([]);
-  const cursorRef   = useRef(0);
-  const finishedRef = useRef(false);
-  const startedRef  = useRef(false);
-  const startTimeRef= useRef<number | null>(null);
-  const errorsRef   = useRef(0);
+  const charsRef      = useRef<CharState[]>([]);
+  const cursorRef     = useRef(0);
+  const finishedRef   = useRef(false);
+  const startedRef    = useRef(false);
+  const startTimeRef  = useRef<number | null>(null);
+  const errorsRef     = useRef(0);
+  const totalTypedRef = useRef(0);
 
-  // React state only for the UI panels that actually need re-renders
   const [started,  setStarted]  = useState(false);
   const [finished, setFinished] = useState(false);
   const [wpm,      setWpm]      = useState(0);
   const [accuracy, setAccuracy] = useState(100);
   const [errors,   setErrors]   = useState(0);
 
-  // DOM refs
-  const scrollRef   = useRef<HTMLDivElement>(null);
-  const charDomRefs = useRef<(HTMLSpanElement | null)[]>([]);
-  const lineDomRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const scrollRef      = useRef<HTMLDivElement>(null);
+  const charDomRefs    = useRef<(HTMLSpanElement | null)[]>([]);
+  const lineDomRefs    = useRef<(HTMLDivElement | null)[]>([]);
+  const progressFillRef = useRef<HTMLDivElement>(null);
+  const progressNoteRef = useRef<HTMLSpanElement>(null);
 
-  // Keep finishedRef in sync so the window handler never reads stale state
   useEffect(() => { finishedRef.current = finished; }, [finished]);
+
+  useEffect(() => {
+    if (!started || finished) return;
+    const interval = setInterval(() => {
+      if (!startTimeRef.current) return;
+      const elapsed = (Date.now() - startTimeRef.current) / 1000 / 60;
+      const correctChars = charsRef.current.filter(s => s === "correct").length;
+      setWpm(Math.round((correctChars / 5) / elapsed));
+    }, 500);
+    return () => clearInterval(interval);
+  }, [started, finished]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -65,22 +75,39 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
     return map;
   }, [text]);
 
+  // Include newline chars as entries so they get a DOM span and can hold the cursor
   const lineChars = useMemo(() => {
-    const result: Array<{ char: string; index: number }[]> = [];
+    const result: Array<{ char: string; index: number; isNewline?: boolean }[]> = [];
     let charIdx = 0;
-    for (const line of text.split("\n")) {
-      const arr: { char: string; index: number }[] = [];
-      for (const char of line) arr.push({ char, index: charIdx++ });
+    const lines = text.split("\n");
+    for (let li = 0; li < lines.length; li++) {
+      const arr: { char: string; index: number; isNewline?: boolean }[] = [];
+      for (const char of lines[li]) arr.push({ char, index: charIdx++ });
+      if (li < lines.length - 1) {
+        arr.push({ char: "\n", index: charIdx++, isNewline: true });
+      }
       result.push(arr);
-      charIdx++;
     }
     return result;
   }, [text]);
 
-  // Inline DOM helpers — no useCallback overhead, called only from event handler
   const setCharDom = (index: number, state: CharState) => {
     const el = charDomRefs.current[index];
-    if (el) el.className = CLASS[state];
+    if (!el) return;
+    if (charDomRefs.current[index]?.dataset.newline) {
+      // Newline span: only show ↵ when active, invisible otherwise
+      el.className = state === "active"
+        ? "relative text-zinc-500 after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-cyan-400 after:animate-pulse"
+        : "relative opacity-0 select-none";
+    } else {
+      el.className = CLASS[state];
+    }
+  };
+
+  const updateProgress = (pos: number) => {
+    const pct = Math.min((pos / text.length) * 100, 100);
+    if (progressFillRef.current) progressFillRef.current.style.width = `${pct}%`;
+    if (progressNoteRef.current) progressNoteRef.current.style.left = `${pct}%`;
   };
 
   const scrollToLine = (lineIndex: number) => {
@@ -93,15 +120,17 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
   const initState = useCallback(() => {
     const initial: CharState[] = text.split("").map(() => "pending");
     let p = 0;
+    // Only skip leading newlines (shouldn't happen after trim, but just in case)
     while (p < text.length && text[p] === "\n") { initial[p] = "correct"; p++; }
     if (p < text.length) initial[p] = "active";
 
-    charsRef.current     = initial;
-    cursorRef.current    = p;
-    finishedRef.current  = false;
-    startedRef.current   = false;
-    startTimeRef.current = null;
-    errorsRef.current    = 0;
+    charsRef.current      = initial;
+    cursorRef.current     = p;
+    finishedRef.current   = false;
+    startedRef.current    = false;
+    startTimeRef.current  = null;
+    errorsRef.current     = 0;
+    totalTypedRef.current = 0;
 
     setStarted(false);
     setFinished(false);
@@ -112,28 +141,29 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
     requestAnimationFrame(() => {
       initial.forEach((state, i) => setCharDom(i, state));
       scrollToLine(charToLine[p] ?? 0);
+      updateProgress(p);
     });
   }, [text, charToLine]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { initState(); }, [initState]);
 
-  // Register keydown on window once — no React synthetic events, no focus dependency
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Never intercept browser shortcuts
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (finishedRef.current) return;
 
       const key = e.key;
+      const cur = cursorRef.current;
 
+      // ── Backspace ──────────────────────────────────────────────────────
       if (key === "Backspace") {
         e.preventDefault();
-        const cur = cursorRef.current;
         if (cur === 0) return;
 
         setCharDom(cur, "pending");
         charsRef.current[cur] = "pending";
 
+        // Go back, skipping newlines
         let p = cur - 1;
         while (p > 0 && text[p] === "\n") {
           setCharDom(p, "pending");
@@ -145,14 +175,43 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
         charsRef.current[p] = "active";
         cursorRef.current = p;
         scrollToLine(charToLine[p] ?? 0);
+        updateProgress(p);
         return;
       }
 
+      // ── Space at a newline — advance to next line ───────────────────────
+      if (text[cur] === "\n") {
+        if (key !== " ") return; // only space advances past newlines
+        e.preventDefault();
+
+        let p = cur;
+        while (p < text.length && text[p] === "\n") {
+          setCharDom(p, "correct");
+          charsRef.current[p] = "correct";
+          p++;
+        }
+
+        if (p >= text.length) {
+          finishedRef.current = true;
+          const elapsed = (Date.now() - (startTimeRef.current ?? Date.now())) / 1000 / 60;
+          const correctChars = charsRef.current.filter(s => s === "correct").length;
+          setWpm(Math.round((correctChars / 5) / elapsed));
+          setAccuracy(Math.round(((totalTypedRef.current - errorsRef.current) / totalTypedRef.current) * 100));
+          setFinished(true);
+          return;
+        }
+
+        setCharDom(p, "active");
+        charsRef.current[p] = "active";
+        cursorRef.current = p;
+        scrollToLine(charToLine[p] ?? 0);
+        updateProgress(p);
+        return;
+      }
+
+      // ── Regular character ───────────────────────────────────────────────
       if (key.length !== 1) return;
       e.preventDefault();
-
-      const cur = cursorRef.current;
-      const isCorrect = key === text[cur];
 
       if (!startedRef.current) {
         startedRef.current   = true;
@@ -160,39 +219,36 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
         setStarted(true);
       }
 
-      if (!isCorrect) {
-        errorsRef.current += 1;
-        setErrors(errorsRef.current);
-      }
+      const isCorrect = key === text[cur];
+      totalTypedRef.current += 1;
+      if (!isCorrect) errorsRef.current += 1;
+      setErrors(errorsRef.current);
+      setAccuracy(Math.round(((totalTypedRef.current - errorsRef.current) / totalTypedRef.current) * 100));
 
       setCharDom(cur, isCorrect ? "correct" : "incorrect");
       charsRef.current[cur] = isCorrect ? "correct" : "incorrect";
 
-      let p = cur + 1;
-      while (p < text.length && text[p] === "\n") {
-        setCharDom(p, "correct");
-        charsRef.current[p] = "correct";
-        p++;
-      }
-
-      const newLine  = charToLine[p] ?? charToLine[text.length - 1] ?? 0;
-
-      if (p < text.length) {
-        setCharDom(p, "active");
-        charsRef.current[p] = "active";
-      }
-      cursorRef.current = p;
-      scrollToLine(newLine);
+      const p = cur + 1;
 
       if (p >= text.length) {
         finishedRef.current = true;
-        const elapsed     = (Date.now() - (startTimeRef.current ?? Date.now())) / 1000 / 60;
-        const wordCount   = text.split(/\s+/).length;
-        const totalErrors = errorsRef.current + (isCorrect ? 0 : 1);
-        setWpm(Math.round(wordCount / elapsed));
-        setAccuracy(Math.round(((text.length - totalErrors) / text.length) * 100));
+        const elapsed = (Date.now() - (startTimeRef.current ?? Date.now())) / 1000 / 60;
+        const correctChars = charsRef.current.filter(s => s === "correct").length;
+        setWpm(Math.round((correctChars / 5) / elapsed));
+        setAccuracy(Math.round(((totalTypedRef.current - errorsRef.current) / totalTypedRef.current) * 100));
         setFinished(true);
+        return;
       }
+
+      // If next char is a newline, show cursor on the ↵ span
+      setCharDom(p, "active");
+      charsRef.current[p] = "active";
+      cursorRef.current = p;
+      updateProgress(p);
+
+      // Only scroll if the newline takes us to the next line
+      const newLine = text[p] === "\n" ? charToLine[p + 1] ?? charToLine[p] ?? 0 : charToLine[p] ?? 0;
+      scrollToLine(newLine);
     };
 
     window.addEventListener("keydown", handler);
@@ -203,14 +259,35 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
 
   return (
     <div className="flex flex-col items-center w-full max-w-3xl gap-6">
-      {/* Stats */}
-      <div className="flex gap-8 text-sm text-zinc-400">
-        <span>WPM: <span className="text-yellow-400 font-mono font-semibold">{wpm || "—"}</span></span>
-        <span>Accuracy: <span className="text-yellow-400 font-mono font-semibold">{started ? `${accuracy}%` : "—"}</span></span>
-        <span>Errors: <span className="text-red-400 font-mono font-semibold">{errors || "—"}</span></span>
+      {/* Stats + progress bar */}
+      <div className="flex items-center justify-center gap-6">
+        <div className="flex items-center gap-6 shrink-0">
+          <div className="text-center">
+            <div className="text-5xl font-bold font-mono text-yellow-400">{wpm || "—"}</div>
+            <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">WPM</div>
+          </div>
+          <div className="text-center">
+            <div className="text-5xl font-bold font-mono text-yellow-400">{started ? `${accuracy}%` : "—"}</div>
+            <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">Accuracy</div>
+          </div>
+        </div>
+
+        <div className="relative w-56 h-3 bg-zinc-800 rounded-full">
+          <div
+            ref={progressFillRef}
+            className="h-full bg-cyan-500/50 rounded-full"
+            style={{ width: "0%", transition: "width 0.1s ease-out" }}
+          />
+          <span
+            ref={progressNoteRef}
+            className="absolute -top-5 text-2xl leading-none -translate-x-1/2 text-cyan-400 select-none"
+            style={{ left: "0%", transition: "left 0.1s ease-out" }}
+          >
+            ♪
+          </span>
+        </div>
       </div>
 
-      {/* Lyrics */}
       <div
         className="relative w-full cursor-text overflow-hidden"
         style={{
@@ -232,13 +309,14 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
               {line.length === 0 ? (
                 <span className="opacity-0">|</span>
               ) : (
-                line.map(({ char, index }) => (
+                line.map(({ char, index, isNewline }) => (
                   <span
                     key={index}
                     ref={(el) => { charDomRefs.current[index] = el; }}
-                    className={CLASS["pending"]}
+                    data-newline={isNewline ? "1" : undefined}
+                    className={isNewline ? "relative opacity-0 select-none" : CLASS["pending"]}
                   >
-                    {char}
+                    {isNewline ? " " : char}
                   </span>
                 ))
               )}
@@ -247,11 +325,10 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
         </div>
       </div>
 
-      {/* Results */}
       {finished && (
         <div className="flex flex-col items-center gap-4 rounded-lg bg-zinc-800 px-10 py-6 text-center">
           <p className="text-2xl font-bold text-yellow-400">{wpm} WPM</p>
-          <p className="text-zinc-300 text-sm">Accuracy: {accuracy}% &nbsp;·&nbsp; Errors: {errors}</p>
+          <p className="text-zinc-300 text-sm">Accuracy: {accuracy}%</p>
           <button
             onClick={handleRestart}
             className="mt-2 rounded-full bg-yellow-400 px-6 py-2 text-sm font-semibold text-zinc-900 hover:bg-yellow-300 transition-colors"

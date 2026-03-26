@@ -157,13 +157,13 @@ export default function Home() {
   return (
     <main
       className="min-h-screen flex flex-col overflow-hidden"
-      style={{ background: "radial-gradient(ellipse at 50% 0%, #1e1533 0%, #0a0a0f 60%)" }}
+      style={{ background: "radial-gradient(ellipse at 50% 0%, #1a4a6b 0%, #0d2540 70%)" }}
     >
       {/* Header */}
       <header className="flex items-center justify-between px-8 py-5 shrink-0">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-white">
-            Lyric<span className="text-violet-400">Type</span>
+            Lyric<span className="text-cyan-400">Type</span>
           </h1>
           <p className="text-xs text-zinc-500 tracking-widest uppercase">Type the lyrics. Feel the music.</p>
         </div>
@@ -188,7 +188,7 @@ export default function Home() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
-              className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-3 text-zinc-100 placeholder-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
+              className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-3 text-zinc-100 placeholder-zinc-500 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
             />
           </div>
           {artists.length > 0 && (
@@ -197,7 +197,7 @@ export default function Home() {
                 <button
                   key={a.artistId}
                   onClick={() => selectArtist(a)}
-                  className="text-left rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-3 hover:border-violet-500 hover:bg-zinc-750 transition-colors"
+                  className="text-left rounded-lg bg-zinc-800 border border-zinc-700 px-4 py-3 hover:border-cyan-500 hover:bg-zinc-750 transition-colors"
                 >
                   <p className="text-zinc-100 font-medium">{a.artistName}</p>
                   {a.primaryGenreName && (
