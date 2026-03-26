@@ -267,7 +267,7 @@ export default function TypingTest({ lyrics, songTitle, artist }: TypingTestProp
   const handleRestart = () => { initState(); };
 
   return (
-    <div className="flex flex-col items-center w-full max-w-3xl gap-6">
+    <div className="flex flex-col items-center w-full gap-6">
       {/* Stats + progress bar */}
       <div className="flex items-center justify-center gap-6">
         <div className="flex items-center gap-6 shrink-0">
