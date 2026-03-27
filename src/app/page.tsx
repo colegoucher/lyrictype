@@ -158,13 +158,11 @@ export default function Home() {
       "Thriller Michael Jackson",
       "Abbey Road Beatles",
       "Aladdin Sane David Bowie",
-      "Sgt Peppers Lonely Hearts Club Band Beatles",
       "My Beautiful Dark Twisted Fantasy Kanye West",
       "Astroworld Travis Scott",
       "London Calling The Clash",
       "Sticky Fingers Rolling Stones",
       "Rumours Fleetwood Mac",
-      "Nevermind Nirvana",
       "Random Access Memories Daft Punk",
       "To Pimp a Butterfly Kendrick Lamar",
       "DAMN Kendrick Lamar",
@@ -189,7 +187,6 @@ export default function Home() {
       "Norman Fucking Rockwell Lana Del Rey",
       "Homogenic Bjork",
       "Stankonia Outkast",
-      "In the Court of the Crimson King King Crimson",
       "Dawn FM The Weeknd",
       "After Hours The Weeknd",
       "When We All Fall Asleep Where Do We Go Billie Eilish",
@@ -780,9 +777,21 @@ export default function Home() {
         {/* ── Typing ── */}
         {step === "typing" && songData && !songResults && (
           <div key="typing" className="step-enter flex-1 flex flex-col px-10 py-8 overflow-hidden">
-            <div className="mb-6 shrink-0">
-              <p className="text-white font-bold text-2xl tracking-tight">{songData.songTitle}</p>
-              <p className="text-zinc-400 text-sm mt-0.5">{songData.artist}</p>
+            <div className="flex items-start justify-between mb-6 shrink-0">
+              <div className="flex items-start gap-3">
+                <div className="w-1 self-stretch rounded-full mt-0.5" style={{ backgroundColor: accentColor }} />
+                <div>
+                  <p className="text-white font-bold text-2xl tracking-tight">{songData.songTitle}</p>
+                  <p className="text-sm mt-0.5 font-medium" style={{ color: accentColor }}>{songData.artist}</p>
+                </div>
+              </div>
+              <button
+                onClick={goBack}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm shrink-0 ml-4"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Back
+              </button>
             </div>
             <TypingTest
               lyrics={songData.lyrics}

@@ -17,10 +17,10 @@ const CONTAINER_HEIGHT = 240;
 const MIDDLE = CONTAINER_HEIGHT / 2;
 
 const CLASS: Record<CharState, string> = {
-  pending:   "relative text-zinc-600",
-  correct:   "relative text-zinc-300",
-  incorrect: "relative text-red-400 bg-red-900/20",
-  active:    "relative text-zinc-600 before:absolute before:-left-px before:top-0 before:h-full before:w-px before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]",
+  pending:   "relative text-zinc-500 before:absolute before:left-0 before:top-0 before:h-full before:w-px before:bg-transparent",
+  correct:   "relative text-zinc-300 before:absolute before:left-0 before:top-0 before:h-full before:w-px before:bg-transparent",
+  incorrect: "relative text-red-400 bg-red-900/20 before:absolute before:left-0 before:top-0 before:h-full before:w-px before:bg-transparent",
+  active:    "relative text-zinc-500 before:absolute before:left-0 before:top-0 before:h-full before:w-px before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]",
 };
 
 export default function TypingTest({
@@ -115,7 +115,7 @@ export default function TypingTest({
     if (!el) return;
     if (charDomRefs.current[index]?.dataset.newline) {
       el.className = state === "active"
-        ? "relative text-zinc-500 before:absolute before:-left-px before:top-0 before:h-full before:w-px before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]"
+        ? "relative text-zinc-500 before:absolute before:left-0 before:top-0 before:h-full before:w-px before:bg-[var(--lyric-accent)] before:[animation:blink_1s_step-end_infinite]"
         : "relative opacity-0 select-none";
     } else {
       el.className = CLASS[state];
@@ -128,8 +128,8 @@ export default function TypingTest({
     if (progressNoteRef.current) progressNoteRef.current.style.left = `${pct}%`;
   };
 
-  const scrollToLine = (lineIndex: number) => {
-    const el = lineDomRefs.current[lineIndex];
+  const scrollToChar = (charIndex: number) => {
+    const el = charDomRefs.current[charIndex];
     if (!el || !scrollRef.current) return;
     const ty = MIDDLE - (el.offsetTop + el.offsetHeight / 2);
     scrollRef.current.style.transform = `translateY(${ty}px)`;
@@ -154,7 +154,7 @@ export default function TypingTest({
 
     requestAnimationFrame(() => {
       initial.forEach((state, i) => setCharDom(i, state));
-      scrollToLine(charToLine[p] ?? 0);
+      scrollToChar(p);
       updateProgress(p);
       if (wpmDomRef.current) wpmDomRef.current.textContent = "—";
       if (accDomRef.current) accDomRef.current.textContent = "—";
@@ -191,36 +191,7 @@ export default function TypingTest({
         setCharDom(p, "active");
         charsRef.current[p] = "active";
         cursorRef.current = p;
-        scrollToLine(charToLine[p] ?? 0);
-        updateProgress(p);
-        return;
-      }
-
-      // Space at newline → advance
-      if (text[cur] === "\n") {
-        if (key !== " ") return;
-        e.preventDefault();
-        let p = cur;
-        while (p < text.length && text[p] === "\n") {
-          setCharDom(p, "correct");
-          charsRef.current[p] = "correct";
-          p++;
-        }
-        if (p >= text.length) {
-          const mins = (Date.now() - (startTimeRef.current ?? Date.now())) / 1000 / 60;
-          const correctChars = charsRef.current.filter(s => s === "correct").length;
-          const finalWpm = Math.round((correctChars / 5) / mins);
-          const finalAcc = Math.round(((totalTypedRef.current - errorsRef.current) / Math.max(totalTypedRef.current, 1)) * 100);
-          const finalElapsed = Math.floor((Date.now() - (startTimeRef.current ?? Date.now())) / 1000);
-          finishedRef.current = true;
-          setFinished(true);
-          onFinish?.(finalWpm, finalAcc, finalElapsed);
-          return;
-        }
-        setCharDom(p, "active");
-        charsRef.current[p] = "active";
-        cursorRef.current = p;
-        scrollToLine(charToLine[p] ?? 0);
+        scrollToChar(p);
         updateProgress(p);
         return;
       }
@@ -245,7 +216,14 @@ export default function TypingTest({
       setCharDom(cur, isCorrect ? "correct" : "incorrect");
       charsRef.current[cur] = isCorrect ? "correct" : "incorrect";
 
-      const p = cur + 1;
+      // Auto-advance past newlines
+      let p = cur + 1;
+      while (p < text.length && text[p] === "\n") {
+        setCharDom(p, "correct");
+        charsRef.current[p] = "correct";
+        p++;
+      }
+
       if (p >= text.length) {
         const mins = (Date.now() - (startTimeRef.current ?? Date.now())) / 1000 / 60;
         const correctChars = charsRef.current.filter(s => s === "correct").length;
@@ -262,8 +240,7 @@ export default function TypingTest({
       charsRef.current[p] = "active";
       cursorRef.current = p;
       updateProgress(p);
-      const newLine = text[p] === "\n" ? charToLine[p + 1] ?? charToLine[p] ?? 0 : charToLine[p] ?? 0;
-      scrollToLine(newLine);
+      scrollToChar(p);
     };
 
     window.addEventListener("keydown", handler);
@@ -272,11 +249,11 @@ export default function TypingTest({
 
   return (
     <div
-      className="flex flex-col w-full flex-1 overflow-hidden"
+      className="relative flex flex-col w-full flex-1 overflow-hidden"
       style={{ "--lyric-accent": accentColor } as React.CSSProperties}
     >
       {/* Stats + progress card */}
-      <div className="w-full bg-zinc-900 rounded-2xl px-6 py-4 flex items-center gap-8 shrink-0 transition-colors duration-200 hover:bg-zinc-800/70 mt-4">
+      <div className="w-full bg-zinc-900 rounded-2xl px-6 py-4 flex items-center gap-8 shrink-0 mt-8">
         <div className="text-center shrink-0">
           <span ref={wpmDomRef} className="text-4xl font-bold font-mono" style={{ color: accentColor }}>—</span>
           <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">WPM</div>
@@ -341,24 +318,18 @@ export default function TypingTest({
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="mt-auto shrink-0 flex items-center gap-3 pt-6">
+      {/* Restart button — bottom center */}
+      <div className="mt-auto shrink-0 flex justify-center pt-6">
         <button
           onClick={initState}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs"
         >
-          <kbd className="font-mono text-zinc-600 text-xs">Tab</kbd>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
           Restart
         </button>
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs"
-          >
-            <kbd className="font-mono text-zinc-600 text-xs">Esc</kbd>
-            Back
-          </button>
-        )}
       </div>
     </div>
   );
