@@ -275,29 +275,27 @@ export default function TypingTest({
       className="flex flex-col w-full flex-1 overflow-hidden"
       style={{ "--lyric-accent": accentColor } as React.CSSProperties}
     >
-      {/* Stats + progress */}
-      <div className="flex items-center justify-center gap-6 shrink-0">
-        <div className="flex items-center gap-6 shrink-0">
-          <div className="text-center">
-            <span ref={wpmDomRef} className="text-5xl font-bold font-mono" style={{ color: accentColor }}>—</span>
-            <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">WPM</div>
-          </div>
-          <div className="text-center">
-            <span ref={accDomRef} className="text-5xl font-bold font-mono" style={{ color: accentColor }}>—</span>
-            <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">Accuracy</div>
-          </div>
+      {/* Stats + progress card */}
+      <div className="w-full bg-zinc-900 rounded-2xl px-6 py-4 flex items-center gap-8 shrink-0 transition-colors duration-200 hover:bg-zinc-800/70">
+        <div className="text-center shrink-0">
+          <span ref={wpmDomRef} className="text-4xl font-bold font-mono" style={{ color: accentColor }}>—</span>
+          <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">WPM</div>
+        </div>
+        <div className="text-center shrink-0">
+          <span ref={accDomRef} className="text-4xl font-bold font-mono" style={{ color: accentColor }}>—</span>
+          <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">Accuracy</div>
         </div>
 
-        {/* Progress bar */}
-        <div className="relative w-56 h-3 bg-zinc-800 rounded-full">
+        {/* Progress bar — stretches to fill remaining space */}
+        <div className="relative flex-1 h-2.5 bg-zinc-700 rounded-full">
           <div
             ref={progressFillRef}
             className="h-full rounded-full"
-            style={{ width: "0%", transition: "width 0.1s ease-out", backgroundColor: accentColor, opacity: 0.5 }}
+            style={{ width: "0%", transition: "width 0.1s ease-out", backgroundColor: accentColor, opacity: 0.6 }}
           />
           <span
             ref={progressNoteRef}
-            className="absolute -top-5 text-2xl leading-none -translate-x-1/2 select-none"
+            className="absolute -top-5 text-xl leading-none -translate-x-1/2 select-none"
             style={{ left: "0%", transition: "left 0.1s ease-out", color: accentColor }}
           >
             ♪
