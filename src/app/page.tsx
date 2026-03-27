@@ -419,6 +419,24 @@ export default function Home() {
     }
   }
 
+  function goHome() {
+    setSongData(null);
+    setError(null);
+    if (topAlbums.length > 0) transitionArt(topAlbums[cycleIndexRef.current % topAlbums.length].artworkUrl);
+    setStep("search");
+  }
+
+  function goBackToTracks() {
+    setSongData(null);
+    setError(null);
+    if (selectedAlbum) {
+      transitionArt(bigArtwork(selectedAlbum.artworkUrl100));
+      setStep("tracks");
+    } else {
+      goHome();
+    }
+  }
+
   function hoverPreview(artUrl: string) {
     if (previewHideRef.current) clearTimeout(previewHideRef.current);
     setPreviewUrl(artUrl);
@@ -751,22 +769,16 @@ export default function Home() {
 
         {/* ── Typing ── */}
         {step === "typing" && songData && (
-          <div key="typing" className="step-enter flex flex-col px-10 py-8 h-full overflow-hidden">
-            {/* Song header */}
-            <div className="mb-7 shrink-0">
-              <h2 className="text-2xl font-bold text-white tracking-tight leading-tight">{songData.songTitle}</h2>
-              <p className="text-zinc-500 text-sm mt-1">{songData.artist}</p>
-            </div>
-
-            <div className="flex-1 min-h-0 flex flex-col">
-              <TypingTest
-                lyrics={songData.lyrics}
-                songTitle={songData.songTitle}
-                artist={songData.artist}
-                accentColor={accentColor}
-                onBack={goBack}
-              />
-            </div>
+          <div key="typing" className="step-enter flex-1 flex flex-col px-10 py-8 overflow-hidden">
+            <TypingTest
+              lyrics={songData.lyrics}
+              songTitle={songData.songTitle}
+              artist={songData.artist}
+              accentColor={accentColor}
+              onBack={goBack}
+              onHome={goHome}
+              onPickFromAlbum={selectedAlbum ? goBackToTracks : undefined}
+            />
           </div>
         )}
 

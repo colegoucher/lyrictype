@@ -8,6 +8,8 @@ interface TypingTestProps {
   artist: string;
   accentColor?: string;
   onBack?: () => void;
+  onHome?: () => void;
+  onPickFromAlbum?: () => void;
 }
 
 type CharState = "pending" | "correct" | "incorrect" | "active";
@@ -28,6 +30,8 @@ export default function TypingTest({
   artist,
   accentColor = "#22d3ee",
   onBack,
+  onHome,
+  onPickFromAlbum,
 }: TypingTestProps) {
   const charsRef      = useRef<CharState[]>([]);
   const cursorRef     = useRef(0);
@@ -282,7 +286,7 @@ export default function TypingTest({
 
   return (
     <div
-      className="flex flex-col w-full flex-1 min-h-0"
+      className="flex flex-col w-full flex-1 overflow-hidden"
       style={{ "--lyric-accent": accentColor } as React.CSSProperties}
     >
       {finished ? (
@@ -290,8 +294,8 @@ export default function TypingTest({
         <div className="completion-enter flex flex-col items-center justify-center flex-1 gap-10">
           {/* Song info */}
           <div className="text-center">
-            <p className="text-white font-semibold text-base">{songTitle}</p>
-            <p className="text-zinc-500 text-sm mt-0.5">{artist}</p>
+            <p className="text-white font-bold text-2xl tracking-tight">{songTitle}</p>
+            <p className="text-zinc-400 text-base mt-1">{artist}</p>
           </div>
 
           {/* Stats row */}
@@ -300,12 +304,12 @@ export default function TypingTest({
               <div className="text-5xl font-bold font-mono leading-none" style={{ color: accentColor }}>{wpm}</div>
               <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">WPM</div>
             </div>
-            <div className="w-px h-14 bg-zinc-800" />
+            <div className="w-px h-14 bg-zinc-600" />
             <div className="text-center">
               <div className="text-5xl font-bold font-mono leading-none" style={{ color: accentColor }}>{accuracy}%</div>
               <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">Accuracy</div>
             </div>
-            <div className="w-px h-14 bg-zinc-800" />
+            <div className="w-px h-14 bg-zinc-600" />
             <div className="text-center">
               <div className="text-5xl font-bold font-mono leading-none text-zinc-400">{formatTime(elapsed)}</div>
               <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">Time</div>
@@ -321,17 +325,23 @@ export default function TypingTest({
             >
               Try Again
             </button>
-            {onBack && (
+            {onPickFromAlbum && (
               <button
-                onClick={onBack}
+                onClick={onPickFromAlbum}
                 className="px-6 py-2.5 rounded-lg text-sm font-semibold bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-all"
               >
-                Pick Another Song
+                Pick from Album
+              </button>
+            )}
+            {onHome && (
+              <button
+                onClick={onHome}
+                className="px-6 py-2.5 rounded-lg text-sm font-semibold bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-all"
+              >
+                Home
               </button>
             )}
           </div>
-
-          <p className="text-zinc-700 text-xs">Tab to restart · Esc to go back</p>
         </div>
       ) : (
         /* ── Typing view ── */
