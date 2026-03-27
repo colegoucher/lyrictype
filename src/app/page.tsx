@@ -126,8 +126,16 @@ export default function Home() {
   const [featuredVisible, setFeaturedVisible] = useState(false);
   const cycleIndexRef                   = useRef(0);
 
+  const [songResults, setSongResults] = useState<{ wpm: number; accuracy: number; elapsed: number } | null>(null);
+
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSearching  = query.trim() !== "";
+
+  const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+  function handleSongFinish(wpm: number, accuracy: number, elapsed: number) {
+    setSongResults({ wpm, accuracy, elapsed });
+  }
 
   // Crossfade left panel to a new url
   const transitionArt = useCallback((newUrl: string) => {
@@ -421,6 +429,7 @@ export default function Home() {
 
   function goHome() {
     setSongData(null);
+    setSongResults(null);
     setError(null);
     if (topAlbums.length > 0) transitionArt(topAlbums[cycleIndexRef.current % topAlbums.length].artworkUrl);
     setStep("search");
@@ -428,6 +437,7 @@ export default function Home() {
 
   function goBackToTracks() {
     setSongData(null);
+    setSongResults(null);
     setError(null);
     if (selectedAlbum) {
       transitionArt(bigArtwork(selectedAlbum.artworkUrl100));
@@ -768,7 +778,7 @@ export default function Home() {
         )}
 
         {/* ── Typing ── */}
-        {step === "typing" && songData && (
+        {step === "typing" && songData && !songResults && (
           <div key="typing" className="step-enter flex-1 flex flex-col px-10 py-8 overflow-hidden">
             <TypingTest
               lyrics={songData.lyrics}
@@ -776,9 +786,62 @@ export default function Home() {
               artist={songData.artist}
               accentColor={accentColor}
               onBack={goBack}
-              onHome={goHome}
-              onPickFromAlbum={selectedAlbum ? goBackToTracks : undefined}
+              onFinish={handleSongFinish}
             />
+          </div>
+        )}
+
+        {/* ── Results ── */}
+        {step === "typing" && songData && songResults && (
+          <div key="results" className="completion-enter flex-1 flex flex-col items-center justify-center gap-10">
+            {/* Song info */}
+            <div className="text-center">
+              <p className="text-white font-bold text-2xl tracking-tight">{songData.songTitle}</p>
+              <p className="text-zinc-400 text-base mt-1">{songData.artist}</p>
+            </div>
+
+            {/* Stats row */}
+            <div className="flex items-center gap-8">
+              <div className="text-center">
+                <div className="text-5xl font-bold font-mono leading-none" style={{ color: accentColor }}>{songResults.wpm}</div>
+                <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">WPM</div>
+              </div>
+              <div className="w-px h-14 bg-zinc-600" />
+              <div className="text-center">
+                <div className="text-5xl font-bold font-mono leading-none" style={{ color: accentColor }}>{songResults.accuracy}%</div>
+                <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">Accuracy</div>
+              </div>
+              <div className="w-px h-14 bg-zinc-600" />
+              <div className="text-center">
+                <div className="text-5xl font-bold font-mono leading-none text-zinc-400">{formatTime(songResults.elapsed)}</div>
+                <div className="text-xs text-zinc-600 uppercase tracking-widest mt-2">Time</div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setSongResults(null)}
+                className="px-6 py-2.5 rounded-lg text-sm font-semibold text-zinc-900 transition-all hover:opacity-90 active:scale-95"
+                style={{ backgroundColor: accentColor }}
+              >
+                Try Again
+              </button>
+              {selectedAlbum && (
+                <button
+                  onClick={goBackToTracks}
+                  className="px-6 py-2.5 rounded-lg text-sm font-semibold bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-all"
+                >
+                  Pick from Album
+                </button>
+              )}
+              <button
+                onClick={goHome}
+                className="px-6 py-2.5 rounded-lg text-sm font-semibold bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-all"
+              >
+                Home
+              </button>
+            </div>
           </div>
         )}
 
