@@ -286,12 +286,12 @@ export default function TypingTest({
 
   return (
     <div
-      className="flex flex-col w-full flex-1 overflow-hidden"
+      className="relative flex flex-col w-full flex-1 overflow-hidden"
       style={{ "--lyric-accent": accentColor } as React.CSSProperties}
     >
       {finished ? (
         /* ── Completion screen ── */
-        <div className="completion-enter flex flex-col items-center justify-center flex-1 gap-10">
+        <div className="completion-enter absolute inset-0 flex flex-col items-center justify-center gap-10">
           {/* Song info */}
           <div className="text-center">
             <p className="text-white font-bold text-2xl tracking-tight">{songTitle}</p>
