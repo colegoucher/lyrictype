@@ -305,7 +305,7 @@ export default function TypingTest({
 
       {/* Lyrics area */}
       <div
-        className="relative w-full cursor-text overflow-hidden flex-1 mt-6"
+        className="relative w-full cursor-text overflow-hidden flex-1 mt-10"
         style={{
           maxHeight: CONTAINER_HEIGHT,
           maskImage: "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
