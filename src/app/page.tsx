@@ -780,6 +780,10 @@ export default function Home() {
         {/* ── Typing ── */}
         {step === "typing" && songData && !songResults && (
           <div key="typing" className="step-enter flex-1 flex flex-col px-10 py-8 overflow-hidden">
+            <div className="mb-6 shrink-0">
+              <p className="text-white font-bold text-2xl tracking-tight">{songData.songTitle}</p>
+              <p className="text-zinc-400 text-sm mt-0.5">{songData.artist}</p>
+            </div>
             <TypingTest
               lyrics={songData.lyrics}
               songTitle={songData.songTitle}
@@ -796,8 +800,8 @@ export default function Home() {
           <div key="results" className="completion-enter flex-1 flex flex-col items-center justify-center gap-10">
             {/* Song info */}
             <div className="text-center">
-              <p className="text-white font-bold text-2xl tracking-tight">{songData.songTitle}</p>
-              <p className="text-zinc-400 text-base mt-1">{songData.artist}</p>
+              <p className="text-white font-bold text-4xl tracking-tight">{songData.songTitle}</p>
+              <p className="text-zinc-400 text-xl mt-1">{songData.artist}</p>
             </div>
 
             {/* Stats row */}
