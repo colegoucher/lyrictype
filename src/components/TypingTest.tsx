@@ -276,7 +276,7 @@ export default function TypingTest({
       style={{ "--lyric-accent": accentColor } as React.CSSProperties}
     >
       {/* Stats + progress card */}
-      <div className="w-full bg-zinc-900 rounded-2xl px-6 py-4 flex items-center gap-8 shrink-0 transition-colors duration-200 hover:bg-zinc-800/70">
+      <div className="w-full bg-zinc-900 rounded-2xl px-6 py-4 flex items-center gap-8 shrink-0 transition-colors duration-200 hover:bg-zinc-800/70 mt-4">
         <div className="text-center shrink-0">
           <span ref={wpmDomRef} className="text-4xl font-bold font-mono" style={{ color: accentColor }}>—</span>
           <div className="text-xs text-zinc-500 uppercase tracking-widest mt-1">WPM</div>
@@ -305,7 +305,7 @@ export default function TypingTest({
 
       {/* Lyrics area */}
       <div
-        className="relative w-full cursor-text overflow-hidden flex-1 mt-10"
+        className="relative w-full cursor-text overflow-hidden flex-1 mt-6"
         style={{
           maxHeight: CONTAINER_HEIGHT,
           maskImage: "linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)",
