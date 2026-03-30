@@ -31,6 +31,7 @@ interface SongResult {
   artistName: string;
   artworkUrl100: string;
   collectionName: string;
+  collectionId: number;
 }
 
 interface SongData {
@@ -246,6 +247,7 @@ export default function Home() {
 
   // ── Debounced unified search ──
   useEffect(() => {
+    let isCurrent = true;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!query.trim()) { setSongs([]); setArtists([]); setAlbumResults([]); return; }
     debounceRef.current = setTimeout(async () => {
@@ -256,6 +258,7 @@ export default function Home() {
           fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=musicArtist&attribute=artistTerm&limit=4`),
         ]);
         const [sData, alData, aData] = await Promise.all([sRes.json(), alRes.json(), aRes.json()]);
+        if (!isCurrent) return;
         const seenIds = new Set<number>();
         const filteredAlbums = (alData.results ?? [])
           .filter((r: { collectionId?: number; collectionName?: string; artworkUrl100?: string }) => {
@@ -276,6 +279,7 @@ export default function Home() {
         setArtists(aData.results ?? []);
       } catch { /* ignore */ }
     }, 280);
+    return () => { isCurrent = false; };
   }, [query]);
 
   // ── Navigation ──
@@ -359,7 +363,8 @@ export default function Home() {
       transitionArt(artUrl);   // base layer transitions to same art
       extractAccentColor(artUrl).then(setAccentColor);
       setSongData({ lyrics: data.lyrics, songTitle: song.trackName, artist: song.artistName, artworkUrl: artUrl });
-      setSelectedAlbum(null);
+      setSelectedAlbum({ collectionId: song.collectionId, collectionName: song.collectionName, artworkUrl100: song.artworkUrl100, artistName: song.artistName });
+      setSelectedArtist({ artistId: 0, artistName: song.artistName });
       setShowPreview(false);   // fade preview out — base now matches, so no visible change
       setStep("typing");
     } catch { setError("Something went wrong fetching lyrics."); }
@@ -381,7 +386,8 @@ export default function Home() {
       transitionArt(artUrl);
       extractAccentColor(artUrl).then(setAccentColor);
       setSongData({ lyrics: data.lyrics, songTitle: album.trackName, artist: album.artist, artworkUrl: artUrl });
-      setSelectedAlbum(null);
+      setSelectedAlbum({ collectionId: album.collectionId, collectionName: album.name, artworkUrl100: artUrl.replace("600x600", "100x100"), artistName: album.artist });
+      setSelectedArtist({ artistId: 0, artistName: album.artist });
       setShowPreview(false);
       setStep("typing");
     } catch { setError("Something went wrong fetching lyrics."); }
@@ -432,13 +438,17 @@ export default function Home() {
     setStep("search");
   }
 
-  function goBackToTracks() {
+  async function goBackToTracks() {
     setSongData(null);
     setSongResults(null);
     setError(null);
     if (selectedAlbum) {
-      transitionArt(bigArtwork(selectedAlbum.artworkUrl100));
-      setStep("tracks");
+      if (tracks.length > 0) {
+        transitionArt(bigArtwork(selectedAlbum.artworkUrl100));
+        setStep("tracks");
+      } else {
+        await selectAlbum(selectedAlbum);
+      }
     } else {
       goHome();
     }
@@ -496,16 +506,16 @@ export default function Home() {
             <div className={`shrink-0 transition-all duration-500 ease-in-out flex items-center gap-3 ${
               isSearching ? "px-10 pt-8 pb-0 justify-start" : "justify-center pt-14 pb-6"
             }`}>
-              <div className={`bg-cyan-500 flex items-center justify-center shrink-0 transition-all duration-500 ${
-                isSearching ? "w-6 h-6 rounded-md" : "w-14 h-14 rounded-2xl"
-              }`}>
-                <svg className={`text-black transition-all duration-500 ${isSearching ? "w-3.5 h-3.5" : "w-8 h-8"}`} viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                </svg>
-              </div>
+              <img
+                src="/lyrictype_logo.png"
+                alt="LyricType"
+                className={`shrink-0 transition-all duration-500 object-contain ${
+                  isSearching ? "w-8 h-8" : "w-24 h-24"
+                }`}
+              />
               <div>
                 <div className={`font-black tracking-tight text-white leading-none transition-all duration-500 ${isSearching ? "text-xl" : "text-5xl"}`}>
-                  Lyric<span className="text-cyan-400">Type</span>
+                  Lyric<span style={{ color: accentColor }}>Type</span>
                 </div>
                 <div className={`text-xs text-zinc-600 tracking-widest uppercase mt-1 transition-all duration-300 overflow-hidden ${
                   isSearching ? "opacity-0 max-h-0 mt-0" : "opacity-100 max-h-4"
@@ -620,23 +630,15 @@ export default function Home() {
               >
                 {featuredAlbum && (
                   <>
-                    <p className="text-zinc-600 text-xs uppercase tracking-widest mb-4 font-medium">Now Featuring</p>
-                    <div className="flex items-center gap-4 mb-5">
-                      <img
-                        src={featuredAlbum.artworkUrl.replace("600x600", "100x100")}
-                        alt={featuredAlbum.name}
-                        className="w-14 h-14 rounded-lg object-cover shrink-0 shadow-lg"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-white font-semibold text-sm leading-tight truncate">{featuredAlbum.trackName}</p>
-                        <p className="text-zinc-400 text-xs mt-0.5 truncate">{featuredAlbum.name}</p>
-                        <p className="text-zinc-600 text-xs mt-0.5 truncate">{featuredAlbum.artist}</p>
-                      </div>
-                    </div>
+                    <p className="text-xs uppercase tracking-widest mb-5 font-medium" style={{ color: accentColor }}>Now Featuring</p>
+                    <p className="text-white font-bold text-2xl leading-tight mb-1">{featuredAlbum.trackName}</p>
+                    <p className="text-zinc-400 text-sm mb-0.5">{featuredAlbum.artist}</p>
+                    <p className="text-zinc-600 text-xs mb-6">{featuredAlbum.name}</p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => selectFeaturedSong(featuredAlbum)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 text-black font-semibold text-sm hover:bg-cyan-400 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-black font-semibold text-sm transition-all hover:opacity-90 active:scale-95"
+                        style={{ backgroundColor: accentColor }}
                       >
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
